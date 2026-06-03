@@ -12,8 +12,9 @@ outputs/
 logs/
 .DS_Store
 
-# Pixi — environment is materialised at runtime; pixi.lock IS tracked.
+# Pixi — environment is materialised at runtime.
 .pixi/
+pixi.lock
 
 # Docker — machine-specific files (use .env.example as template)
 .devcontainer/.env
