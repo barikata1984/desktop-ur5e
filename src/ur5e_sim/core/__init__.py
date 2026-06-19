@@ -9,7 +9,6 @@ from ur5e_sim.core.controllers.registry import (
 from ur5e_sim.core.env import SimEnv
 from ur5e_sim.core.ik import (
     ORI_GAIN,
-    R_TOOL0_DES,
     damped_pinv,
     get_jacobian,
     get_jacobian6,
@@ -37,7 +36,6 @@ __all__ = [
     "Logger",
     "NpzLogger",
     "ORI_GAIN",
-    "R_TOOL0_DES",
     "RunConfig",
     "Sensor",
     "SimEnv",

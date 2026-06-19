@@ -10,6 +10,9 @@ from __future__ import annotations
 import mujoco
 import numpy as np
 
+# Vertical pusher orientation: +x -> world +x, +z -> world -z (straight down).
+R_TOOL0_DES = np.array([[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]])
+
 
 def slider_pose_from_data(d: mujoco.MjData, slider_body_id: int) -> tuple[np.ndarray, float]:
     """World position and yaw angle (theta) of the slider body."""

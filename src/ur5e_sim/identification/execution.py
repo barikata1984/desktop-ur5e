@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import mujoco
 import numpy as np
 
+from ur5e_sim.core.sensors import FTSensor
 from ur5e_sim.core.types import get_site_frame
 from ur5e_sim.trajectories.base import TrajectorySample
 
@@ -76,15 +77,12 @@ class TrajectoryPlayback:
         data = self._data
         n_joints = trajectory.position.shape[1]
 
-        # Resolve the tool0 force/torque sensors. When both exist, the wrench is
-        # read directly from the simulator's interaction force/torque (matching a
-        # physical FT sensor) rather than computed from the regressor.
-        force_sid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SENSOR, cfg.force_sensor_name)
-        torque_sid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SENSOR, cfg.torque_sensor_name)
-        use_ft_sensor = force_sid >= 0 and torque_sid >= 0
-        if use_ft_sensor:
-            force_adr = int(model.sensor_adr[force_sid])
-            torque_adr = int(model.sensor_adr[torque_sid])
+        try:
+            ft_sensor = FTSensor(model, cfg.force_sensor_name, cfg.torque_sensor_name)
+            use_ft_sensor = True
+        except ValueError:
+            ft_sensor = None
+            use_ft_sensor = False
 
         # The analytic-fallback wrench needs the payload's rigid-body inertia.
         # The FT-sensor path does not, so only resolve it when needed -- this lets
@@ -174,14 +172,7 @@ class TrajectoryPlayback:
                 ee_rot = np.eye(3, dtype=np.float64)
 
             if use_ft_sensor:
-                # MuJoCo FT sensor: force/torque in the site frame. The regressor
-                # orders the wrench as [torque; force] and equals +cfrc_int
-                # (verified to match the analytic rigid-body wrench when the
-                # regressor is sampled about this site), so record [torque; force]
-                # without negation, matching the analytic-fallback ordering.
-                force = np.array(data.sensordata[force_adr : force_adr + 3], dtype=np.float64)
-                torque = np.array(data.sensordata[torque_adr : torque_adr + 3], dtype=np.float64)
-                wrench = np.concatenate((torque, force))
+                wrench = ft_sensor.read(model, data)
             else:
                 # Fallback: analytic rigid-body regressor wrench ([torque; force]).
                 reg_sample = sample_body_regressor(model, data, cfg.body_name)

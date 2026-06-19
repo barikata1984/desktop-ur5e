@@ -3,11 +3,6 @@ from __future__ import annotations
 import mujoco
 import numpy as np
 
-# Desired tool0 (attachment_site) orientation: +x -> world +x, +z -> world -z
-# (straight down), so the closed gripper is a vertical pusher with its finger
-# axis perpendicular to the push direction. Held by the IK layer; the MPC is
-# unchanged and purely 2D.
-R_TOOL0_DES = np.array([[1.0, 0.0, 0.0], [0.0, -1.0, 0.0], [0.0, 0.0, -1.0]])
 ORI_GAIN = 2.0
 
 
@@ -24,10 +19,14 @@ def get_jacobian(m: mujoco.MjModel, d: mujoco.MjData, site_id: int) -> np.ndarra
     return jacp[:, :6]
 
 
-def orientation_error(d: mujoco.MjData, site_id: int) -> np.ndarray:
-    """World-frame axis-angle rotation driving the site toward R_TOOL0_DES."""
+def orientation_error(
+    d: mujoco.MjData, site_id: int, R_des: np.ndarray | None = None
+) -> np.ndarray:
+    """World-frame axis-angle rotation driving the site toward R_des."""
+    if R_des is None:
+        R_des = np.eye(3)
     quat = np.zeros(4)
-    r_err = R_TOOL0_DES @ d.site_xmat[site_id].reshape(3, 3).T
+    r_err = R_des @ d.site_xmat[site_id].reshape(3, 3).T
     mujoco.mju_mat2Quat(quat, r_err.flatten())
     n = np.linalg.norm(quat[1:])
     return quat[1:] / n * 2 * np.arctan2(n, quat[0]) if n > 1e-9 else np.zeros(3)

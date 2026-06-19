@@ -241,7 +241,14 @@ def compute_stacked_body_regressor(
 
     rows: list[np.ndarray] = []
     for index in trajectory_subsample_indices(q_array.shape[0], subsample_factor):
-        set_model_state(model, data, q_array[index], dq_array[index], ddq_array[index])
+        set_model_state(
+            model,
+            data,
+            q_array[index],
+            dq_array[index],
+            ddq_array[index],
+            compute_kinematics=False,
+        )
         rows.append(sample_body_regressor(model, data, body_name, site_name).regressor)
 
     stacked = np.vstack(rows)

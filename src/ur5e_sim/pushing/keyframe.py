@@ -26,13 +26,9 @@ from __future__ import annotations
 import mujoco
 import numpy as np
 
-from ur5e_sim.core.ik import get_jacobian6, orientation_error
+from ur5e_sim.core.ik import damped_pinv, get_jacobian6, orientation_error
 from ur5e_sim.pushing import paths
-
-
-def damped_pinv(J: np.ndarray, damping: float = 1e-3) -> np.ndarray:
-    JJT = J @ J.T
-    return J.T @ np.linalg.inv(JJT + damping**2 * np.eye(JJT.shape[0]))
+from ur5e_sim.pushing.kinematics import R_TOOL0_DES
 
 
 def close_gripper_sim(
@@ -81,7 +77,7 @@ def solve_ik(
     for i in range(max_iter):
         tip = d.site_xpos[tip_site_id].copy()
         perr = target_pos - tip
-        oerr = orientation_error(d, ori_site_id)
+        oerr = orientation_error(d, ori_site_id, R_TOOL0_DES)
         pdist = np.linalg.norm(perr)
         odist = np.linalg.norm(oerr)
         if pdist < pos_tol and odist < ori_tol:
@@ -104,7 +100,7 @@ def solve_ik(
 
     tip_final = d.site_xpos[tip_site_id].copy()
     pos_err = np.linalg.norm(target_pos - tip_final)
-    ori_err = np.linalg.norm(orientation_error(d, ori_site_id))
+    ori_err = np.linalg.norm(orientation_error(d, ori_site_id, R_TOOL0_DES))
     return d.qpos[:6].copy(), pos_err, ori_err
 
 
@@ -208,7 +204,7 @@ def main() -> None:
     mujoco.mj_forward(m, d)
     tip_fk = d.site_xpos[tip_site_id].copy()
     best_perr = np.linalg.norm(target_tip - tip_fk)
-    best_oerr = np.linalg.norm(orientation_error(d, ori_site_id))
+    best_oerr = np.linalg.norm(orientation_error(d, ori_site_id, R_TOOL0_DES))
     if best_perr > 0.002 or best_oerr > 0.01:
         print(f"\nWARNING: best pos_err={best_perr:.4f}m ori_err={best_oerr:.4f}rad")
     else:

@@ -14,6 +14,8 @@ def set_model_state(
     qpos: np.ndarray,
     qvel: np.ndarray | None = None,
     qacc: np.ndarray | None = None,
+    *,
+    compute_kinematics: bool = True,
 ) -> None:
     qpos_array = np.asarray(qpos, dtype=np.float64)
     if qpos_array.shape != (model.nq,):
@@ -37,13 +39,13 @@ def set_model_state(
             raise ValueError(f"qacc must have shape ({model.nv},)")
         data.qacc[:] = qacc_array
 
-    # Compute position and velocity kinematics without solving forward dynamics.
-    # mj_forward would overwrite qacc with values from the equations of motion
-    # and leave cacc (body Cartesian accelerations) unpopulated, causing
-    # sample_body_kinematics to return zero angular acceleration.
-    mujoco.mj_kinematics(model, data)
-    mujoco.mj_comPos(model, data)
-    mujoco.mj_fwdVelocity(model, data)
+    if compute_kinematics:
+        # Compute position and velocity kinematics without solving forward dynamics.
+        # mj_forward would overwrite qacc; these three calls preserve it.
+        # Skip when mj_inverse follows immediately (it subsumes all three).
+        mujoco.mj_kinematics(model, data)
+        mujoco.mj_comPos(model, data)
+        mujoco.mj_fwdVelocity(model, data)
 
 
 def _sample_site_kinematics(

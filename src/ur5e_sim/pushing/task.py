@@ -19,9 +19,10 @@ import numpy as np
 
 from ur5e_sim.core.ik import ORI_GAIN, damped_pinv, get_jacobian6, orientation_error
 from ur5e_sim.core.renderer import FrameRenderer, encode_video
+from ur5e_sim.core.sensors import ContactSensor
 from ur5e_sim.pushing.config import SimConfig
 from ur5e_sim.pushing.io import Log, create_trial_dir, dump_config
-from ur5e_sim.pushing.kinematics import pusher_in_slider_body, slider_pose_from_data
+from ur5e_sim.pushing.kinematics import R_TOOL0_DES, pusher_in_slider_body, slider_pose_from_data
 from ur5e_sim.pushing.mpc import PusherSliderMPC
 
 # gripper_pinch sits PINCH_TO_PAD_FRONT behind the closed pad front face (the
@@ -48,7 +49,7 @@ def move_tip_to(
         mujoco.mj_forward(m, d)
         tip = d.site_xpos[tip_site_id].copy()
         perr = target_pos - tip
-        oerr = orientation_error(d, tool0_site_id)
+        oerr = orientation_error(d, tool0_site_id, R_TOOL0_DES)
         if np.linalg.norm(perr) < tol and np.linalg.norm(oerr) < 0.01:
             break
         pstep = perr * cfg.robot.ik_gain
@@ -66,24 +67,6 @@ def move_tip_to(
         if renderer is not None:
             renderer.capture(d)
     return ctrl
-
-
-def get_pusher_slider_contact_force(
-    m: mujoco.MjModel,
-    d: mujoco.MjData,
-    pad_geom_ids: list[int],
-    slider_geom_id: int,
-) -> np.ndarray:
-    total = np.zeros(3)
-    pad_set = set(pad_geom_ids)
-    for i in range(d.ncon):
-        c = d.contact[i]
-        g1, g2 = c.geom1, c.geom2
-        if (g1 in pad_set and g2 == slider_geom_id) or (g1 == slider_geom_id and g2 in pad_set):
-            force = np.zeros(6)
-            mujoco.mj_contactForce(m, d, i, force)
-            total += force[:3]
-    return total
 
 
 def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
@@ -112,6 +95,7 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
         ]
     ]
     slider_geom_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, "slider_geom")
+    contact_sensor = ContactSensor(pad_geom_ids, slider_geom_id)
 
     mujoco.mj_resetDataKeyframe(m, d, key_id)
     mujoco.mj_forward(m, d)
@@ -175,7 +159,7 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
         slider_pos, slider_theta = slider_pose_from_data(d, slider_body_id)
         slider_quat = d.xquat[slider_body_id].copy()
         pusher_body = pusher_in_slider_body(tip_pos, slider_pos, slider_theta)
-        contact_force = get_pusher_slider_contact_force(m, d, pad_geom_ids, slider_geom_id)
+        contact_force = contact_sensor.read(m, d)
 
         log.time.append(d.time)
         log.slider_x.append(slider_pos[0])
@@ -242,7 +226,7 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
         v_des_3d = np.array([v_world_xy[0], v_world_xy[1], 5.0 * z_error])
 
         # Hold tool0 vertical (R_TOOL0_DES) while executing the MPC's 2D push velocity.
-        omega = ORI_GAIN * orientation_error(d, tool0_site_id)
+        omega = ORI_GAIN * orientation_error(d, tool0_site_id, R_TOOL0_DES)
         v6 = np.concatenate([v_des_3d, omega])
         J = get_jacobian6(m, d, tip_site_id, tool0_site_id)
         dq = damped_pinv(J, cfg.robot.damping) @ (v6 * cfg.mpc.dt)
