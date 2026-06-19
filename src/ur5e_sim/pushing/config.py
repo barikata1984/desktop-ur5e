@@ -13,8 +13,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-import numpy as np
-
 from ur5e_sim.pushing import paths
 
 
@@ -80,11 +78,3 @@ class SimConfig:
     def scene_path(self) -> str:
         """Absolute path to the scene XML (resolved under ``scenes/``)."""
         return paths.scene_path(self.scene)
-
-    @property
-    def q_weights_arr(self) -> np.ndarray:
-        return np.array(self.mpc.q_weights)
-
-    @property
-    def r_weights_arr(self) -> np.ndarray:
-        return np.array(self.mpc.r_weights)

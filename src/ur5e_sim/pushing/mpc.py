@@ -549,10 +549,6 @@ class PusherSliderMPC:
         C = self._rotation_matrix(theta)
         return C @ v_body
 
-    def body_to_contact(self, vp_x: float, vp_y: float) -> np.ndarray:
-        """Convert body-frame velocity to contact-aligned velocity."""
-        return self.R_face @ np.array([vp_x, vp_y])
-
 
 def generate_straight_trajectory(
     y_start: float = 0.2,
