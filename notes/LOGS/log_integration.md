@@ -101,3 +101,21 @@ ruff check / ruff format ともにクリーン.
 ### README 更新
 
 テンプレート文から ur5e-sim プロジェクト固有の内容に全面書き換えた.
+
+---
+
+## 2026-06-19 — devcontainer postCreateCommand 修正
+
+### 問題
+
+`postCreateCommand: python --version` が exit code 127 ("not found") で失敗していた.
+
+### 根本原因
+
+`postCreateCommand` は非インタラクティブシェルで実行されるため `~/.zshrc` が source されない. そのため pixi の shell-hook が走らず, pixi 環境の PATH (`${WORKSPACE_DIR}/.pixi/envs/default/bin`) が設定されない状態だった.
+
+### 修正内容
+
+`.devcontainer/Dockerfile` の `/etc/zsh/zshenv` heredoc に `${WORKSPACE_DIR}/.pixi/envs/default/bin` を追加した (既存の `~/.local/bin` の前に挿入). `zshenv` はインタラクティブ・非インタラクティブ問わず全 zsh コンテキストで読み込まれるため, `python` コマンドが全ての実行環境で解決できるようになった.
+
+`devcontainer.json` の `postCreateCommand` はそのまま `python --version` を維持 (絶対パス不要).

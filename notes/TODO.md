@@ -7,3 +7,4 @@
 - [x] identification/ 慣性同定コードの移行
 - [x] scripts/ と configs/ の作成
 - [x] テストの移行と全体検証
+- [x] devcontainer postCreateCommand の `python --version` 失敗を修正
