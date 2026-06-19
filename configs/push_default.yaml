@@ -1,0 +1,35 @@
+# Default configuration for the UR5e push task.
+# Override any value via tyro CLI flags (e.g. --push.y-goal 0.85 --mpc.v-max 0.1).
+
+scene: "tasks/push.xml"
+
+push:
+  push_speed: 0.03
+  y_start: 0.5
+  y_goal: 0.9
+  max_sim_time: 30.0
+
+mpc:
+  dt: 0.03
+  horizon: 10
+  v_max: 0.08
+  contact_face: "-y"
+  slider_dims: [0.08, 0.06]
+  mass: 1.05
+  mu_pusher: 0.3
+  mu_ground: 0.35
+  q_weights: [30.0, 10.0, 15.0, 0.1]
+  r_weights: [0.1, 0.1]
+  q_terminal_scale: 10.0
+
+robot:
+  damping: 0.001
+  ik_gain: 2.0
+  ik_max_step: 0.02
+
+render:
+  width: 960
+  height: 720
+  camera: "side"
+  fps: 30
+  every_n_mpc: 1

@@ -1,0 +1,63 @@
+# Default configuration for UR5e inertial parameter identification pipeline.
+# Override any value via tyro CLI flags (e.g. --num-harmonics 7 --duration 8.0).
+
+model:
+  path: "scenes/tasks/identification.xml"
+  body_name: "payload_box_mount"
+  site_name: "attachment_site"
+
+trajectory:
+  num_joints: 6
+  num_harmonics: 5
+  base_freq: 0.2
+  duration: 5.0
+  fps: 100.0
+
+optimizer:
+  subsample_factor: 5
+  n_monte_carlo: 20
+  max_iter_per_start: 200
+  optimizer_method: "SLSQP"
+  ftol: 1.0e-6
+  seed: 42
+  objective: "condition_number"
+
+joint_limits:
+  q_min: [-6.2832, -6.2832, -6.2832, -6.2832, -6.2832, -6.2832]
+  q_max: [6.2832, 6.2832, 6.2832, 6.2832, 6.2832, 6.2832]
+  dq_max: 1.5   # rad/s, 0 to disable
+  ddq_max: 0.0  # rad/s^2, 0 to disable
+
+ee_velocity:
+  max_linear_velocity: 0.0  # 0 to disable
+
+workspace:
+  max_displacement: 0.0  # m, 0 to disable
+  safety_margin: 0.01
+
+collision:
+  ground_z_min: 0.01
+  self_collision_min_dist: 0.02
+  self_collision_radii: [0.06, 0.05, 0.045, 0.035, 0.035, 0.03]
+  safety_margin: 0.05
+
+playback:
+  dt: 0.002
+  use_pd_control: false
+  noise_std_q: 0.0
+  noise_std_dq: 0.0
+  noise_std_wrench: 0.0
+
+rendering:
+  width: 960
+  height: 544
+  fps_video: 30
+  show_ee_frame: true
+  axis_length: 0.15
+  playback_speed: 1.0
+
+output:
+  optimization_result: "results/excitation_result.json"
+  identification_result: "results/identification_result.json"
+  playback_data: "results/playback_data.npz"
+  video: "results/excitation_playback.mp4"
