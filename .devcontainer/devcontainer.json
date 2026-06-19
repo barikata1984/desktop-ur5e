@@ -1,5 +1,5 @@
 {
-  "name": "My Project",  // TODO: rename to your project name
+  "name": "Destop UR5e",  // TODO: rename to your project name
 
   // Use docker-compose as the backend — minimal devcontainer-specific config.
   // The same docker-compose.yaml works standalone with `docker compose up`.
