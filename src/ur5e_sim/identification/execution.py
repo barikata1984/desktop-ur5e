@@ -94,6 +94,21 @@ class TrajectoryPlayback:
         if not use_ft_sensor:
             params = body_inertial_parameters_from_model(model, cfg.body_name)
 
+        # Pad trajectory to model DOFs when it covers only a subset (e.g. 6 arm
+        # joints on a 14-DOF model with gripper). Extra DOFs are held at zero.
+        nq, nv = model.nq, model.nv
+        if n_joints < nq:
+            pad_q = nq - n_joints
+            pad_v = nv - n_joints
+            trajectory = TrajectorySample(
+                time=trajectory.time,
+                position=np.hstack([trajectory.position, np.zeros((len(trajectory.time), pad_q))]),
+                velocity=np.hstack([trajectory.velocity, np.zeros((len(trajectory.time), pad_v))]),
+                acceleration=np.hstack(
+                    [trajectory.acceleration, np.zeros((len(trajectory.time), pad_v))]
+                ),
+            )
+
         buffer = DataBuffer()
         n_steps = len(trajectory.time)
 
