@@ -98,6 +98,10 @@ if [ -n "${DOPPLER_TOKEN:-}" ] && command -v doppler >/dev/null 2>&1; then
     unset _doppler_env DOPPLER_TOKEN
 fi
 
+# Pixi-managed Python: make python/pip/etc. resolve in non-interactive shells
+# (postCreateCommand, scripts) where ~/.zshrc's pixi shell-hook does not run.
+[[ -d "${WORKSPACE_DIR}/.pixi/envs/default/bin" ]] && export PATH="${WORKSPACE_DIR}/.pixi/envs/default/bin:${PATH}"
+
 # ~/.local/bin: native CLI installs (e.g. claude install) land here.
 [[ -d "${HOME}/.local/bin" ]] && export PATH="${HOME}/.local/bin:${PATH}"
 
