@@ -1,0 +1,39 @@
+<mujoco model="slider">
+  <!--
+    Push slider: 80x60x30 mm block (Hogan 2016: m=1.05 kg) with a freejoint,
+    resting on the work surface. Includes the goal marker site.
+    Intended for use via <include>.
+  -->
+
+  <default>
+    <default class="slider_contact">
+      <geom condim="4" friction="0.35 0.005 0.001"
+        solref="0.02 1" solimp="0.9 0.95 0.001 0.5 2"/>
+    </default>
+  </default>
+
+  <asset>
+    <material name="slider_mat" rgba="0.2 0.6 0.85 1"
+      specular="0.3" shininess="0.2"/>
+  </asset>
+
+  <worldbody>
+    <!-- Goal marker: base (0, 0.8) = world (0, 0.9), on the work-surface top (z=0.327) -->
+    <site name="goal_mark" pos="0 0.9 0.328" type="cylinder" size="0.025 0.001"
+      rgba="1 0 0 1"/>
+
+    <!-- Slider: base-frame start (0, 0.4); z = work-surface top 0.327 + half-height 0.015 = 0.342. -->
+    <body name="slider" pos="0 0.5 0.342">
+      <freejoint name="slider_joint"/>
+      <inertial mass="1.05" pos="0 0 0"
+        diaginertia="0.000394 0.000525 0.000164"/>
+      <geom name="slider_geom" type="box" size="0.04 0.03 0.015"
+        class="slider_contact" material="slider_mat"/>
+      <site name="slider_center" pos="0 0 0" size="0.003" rgba="1 0 0 1"/>
+      <site name="slider_corner_pp" pos="0.04 0.03 0" size="0.002" rgba="0 1 0 1"/>
+      <site name="slider_corner_np" pos="-0.04 0.03 0" size="0.002" rgba="0 0 1 1"/>
+      <site name="slider_corner_nn" pos="-0.04 -0.03 0" size="0.002" rgba="1 1 0 1"/>
+      <site name="slider_corner_pn" pos="0.04 -0.03 0" size="0.002" rgba="1 0 1 1"/>
+    </body>
+  </worldbody>
+</mujoco>

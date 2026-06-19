@@ -1,0 +1,69 @@
+<mujoco model="environment">
+  <!--
+    Shared environment for the unified UR5e project.
+    Provides simulation options, lighting, table, work surface, ground plane,
+    cameras, and environment materials. No robot or task-specific elements.
+    Intended for use via <include>.
+  -->
+
+  <option integrator="implicitfast" timestep="0.002" cone="elliptic" impratio="10">
+    <flag warmstart="enable"/>
+  </option>
+
+  <statistic center="0 0.4 0.35" extent="0.8"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-20" offwidth="1920" offheight="1440"/>
+  </visual>
+
+  <default>
+    <default class="table_contact">
+      <geom condim="4" friction="0.5 0.005 0.001"/>
+    </default>
+  </default>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0"
+      width="512" height="3072"/>
+    <texture type="2d" name="table_tex" builtin="checker" mark="edge"
+      rgb1="0.6 0.6 0.6" rgb2="0.5 0.5 0.5" markrgb="0.4 0.4 0.4"
+      width="300" height="300"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge"
+      rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8"
+      width="300" height="300"/>
+    <material name="table_mat" texture="table_tex" texuniform="true"
+      texrepeat="3 3" reflectance="0.1"/>
+    <material name="work_mat" rgba="0.80 0.66 0.45 1"
+      specular="0.1" shininess="0.1" reflectance="0.0"/>
+    <material name="groundplane" texture="groundplane" texuniform="true"
+      texrepeat="5 5" reflectance="0.2"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0.4 1.5" dir="0 0 -1" directional="true"/>
+
+    <!-- Ground plane -->
+    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
+
+    <!-- Table: surface at z=0.3, extended in +y (to y=1.1) to fully support the work surface -->
+    <body name="table" pos="0 0.55 0.275">
+      <geom name="table_surface" type="box" size="0.5 0.55 0.025"
+        class="table_contact" material="table_mat" mass="50"/>
+    </body>
+
+    <!-- Work surface: 0.65 x 0.60 m beige board, 27 mm thick, resting on the table.
+         Base-frame footprint: y in [0.35, 0.95], x in [-0.325, 0.325]
+         (world y [0.45, 1.05], world x [-0.325, 0.325]); top at z=0.327. -->
+    <body name="work_surface" pos="0 0.75 0.3135">
+      <geom name="work_surface_geom" type="box" size="0.325 0.3 0.0135"
+        class="table_contact" material="work_mat" mass="20"/>
+    </body>
+
+    <!-- Top-down camera centered on push area -->
+    <camera name="top_down" pos="0 0.5 1.2" xyaxes="1 0 0 0 1 0" fovy="45"/>
+    <!-- Side view -->
+    <camera name="side" pos="0.7 0.5 0.55" xyaxes="0 1 0 -0.25 0 0.97" fovy="60"/>
+  </worldbody>
+</mujoco>

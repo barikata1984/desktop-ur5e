@@ -1,0 +1,22 @@
+<mujoco model="identification">
+  <!--
+    Composed inertial-parameter identification scene: UR5e + FT300s + Robotiq
+    2F-85 carrying a rigid payload, on the shared environment.
+
+    The payload (payload_box.xml) is included inside gripper_mount within
+    ur5e_ft300s_gripper.xml so it is a rigid child of the EE subtree measured
+    by ft_sensor; it is therefore NOT re-included here.
+  -->
+  <compiler angle="radian" autolimits="true"/>
+
+  <include file="../common/environment.xml"/>
+  <include file="../common/robots/ur5e_ft300s_gripper.xml"/>
+
+  <keyframe>
+    <!-- qpos: 6 arm + 8 gripper = 14 values (payload is rigid, no joints)
+         ctrl: 6 arm + 1 gripper = 7 values -->
+    <key name="home"
+      qpos="1.324683 -1.468515 1.368294 -1.470575 -1.570796 -0.246113 0 0 0 0 0 0 0 0"
+      ctrl="1.324683 -1.468515 1.368294 -1.470575 -1.570796 -0.246113 0"/>
+  </keyframe>
+</mujoco>

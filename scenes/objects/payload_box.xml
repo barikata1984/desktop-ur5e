@@ -1,0 +1,20 @@
+<mujoco model="payload_box">
+  <!--
+    Identification payload, mounted rigidly on the end effector.
+    This file is a bare-body fragment: <include> it INSIDE the end-effector
+    body (e.g. gripper_mount) so payload_box_mount becomes a rigid child of
+    the kinematic subtree seen by the FT sensor.
+    Colors are set via geom rgba to keep the fragment self-contained
+    (no <asset> block, which is invalid when inlined into a body).
+  -->
+  <body name="payload_box_mount" pos="0 0 0">
+    <body name="payload_blue_body" pos="0 0 0">
+      <geom name="payload_box_blue" type="box" pos="0 0 0.1" size="0.05 0.05 0.1"
+        rgba="0.2 0.35 0.85 1" density="200"/>
+      <body name="payload_red_body" pos="0 0 0.2">
+        <geom name="payload_box_red" type="box" pos="0 0 0.05" size="0.05 0.15 0.05"
+          rgba="0.85 0.2 0.2 1" density="200"/>
+      </body>
+    </body>
+  </body>
+</mujoco>
