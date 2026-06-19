@@ -73,14 +73,7 @@ def d_optimal_objective(
     with_ft_offset: bool = False,
     column_scale: bool = False,
 ) -> float:
-    """D-optimal objective: -log det(W^T W) = -2 * sum(log(sigma_i)).
-
-    Smooth (C^inf) alternative to condition number minimization.
-    Maximizes the volume of the information ellipsoid, encouraging all
-    singular values to be large rather than just minimizing their ratio.
-
-    Returns a large finite value (1e12) on numerical failure.
-    """
+    """D-optimal objective: -log det(W^T W) = -2 * sum(log(sigma_i))."""
     try:
         stacked = _compute_stacked_regressor(
             x, cache, model, data, body_name, subsample_factor, with_ft_offset

@@ -171,8 +171,8 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
         log.pusher_z.append(tip_pos[2])
         log.pusher_body_px.append(pusher_body[0])
         log.pusher_body_py.append(pusher_body[1])
-        log.joint_pos.append(d.qpos[:6].copy().tolist())
-        log.joint_ctrl.append(d.ctrl[:6].copy().tolist())
+        log.joint_pos.append(d.qpos[:6].tolist())
+        log.joint_ctrl.append(d.ctrl[:6].tolist())
         log.contact_count.append(d.ncon)
         log.contact_forces.append(contact_force.tolist())
 

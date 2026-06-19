@@ -135,10 +135,8 @@ def render_scene(
     width = min(width, int(model.vis.global_.offwidth))
     height = min(height, int(model.vis.global_.offheight))
     renderer = mujoco.Renderer(model, height=height, width=width)
-    if camera is None:
-        renderer.update_scene(data)
-    else:
-        renderer.update_scene(data, camera=camera)
+    cam_kwargs = {} if camera is None else {"camera": camera}
+    renderer.update_scene(data, **cam_kwargs)
 
     if show_base_frame:
         add_base_frame_overlay(model, data, renderer.scene, axis_length)

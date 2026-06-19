@@ -211,10 +211,6 @@ def compute_fourier_bounds(
     return upper
 
 
-# Backward-compatible alias
-compute_fourier_velocity_bounds = compute_fourier_bounds
-
-
 def build_scipy_constraints(
     cache: _TrajectoryCache,
     joint_limits: JointLimits,
