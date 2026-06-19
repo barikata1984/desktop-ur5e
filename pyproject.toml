@@ -15,7 +15,7 @@ dependencies = [
     "pillow",
     "tyro",
     "pyyaml",
-    "imageio",
+    "imageio[ffmpeg]",
 ]
 
 [project.optional-dependencies]

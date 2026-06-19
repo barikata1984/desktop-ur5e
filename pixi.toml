@@ -46,5 +46,5 @@ ffmpeg = ">=8,<9"
 [pypi-dependencies]
 tyro = "*"
 pyyaml = "*"
-imageio = "*"
+imageio = { version = "*", extras = ["ffmpeg"] }
 ur5e-sim = { path = ".", editable = true }
