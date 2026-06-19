@@ -176,14 +176,14 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
         log.contact_count.append(d.ncon)
         log.contact_forces.append(contact_force.tolist())
 
+        done = False
         if slider_pos[1] >= cfg.push.y_goal:
             print(f"Goal reached: slider_y={slider_pos[1]:.4f} >= {cfg.push.y_goal}")
-            log.vn.append(0.0)
-            log.vt.append(0.0)
-            log.target_y.append(cfg.push.y_goal)
-            break
-        if d.time - t_start > cfg.push.max_sim_time:
+            done = True
+        elif d.time - t_start > cfg.push.max_sim_time:
             print(f"Max time reached: {cfg.push.max_sim_time}s")
+            done = True
+        if done:
             log.vn.append(0.0)
             log.vt.append(0.0)
             log.target_y.append(cfg.push.y_goal)
