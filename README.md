@@ -31,11 +31,8 @@ tests/                  テストスイート
 # サブモジュール取得
 git submodule update --init
 
-# pixi で環境構築 (コンテナ内)
+# pixi で環境構築 (コンテナ内で自動実行済み)
 pixi install
-
-# または pip で editable install
-pip install -e .
 ```
 
 ## 使い方

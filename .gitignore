@@ -9,6 +9,7 @@ build/
 wandb/
 runs/
 outputs/
+results/
 logs/
 .DS_Store
 
