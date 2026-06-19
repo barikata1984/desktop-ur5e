@@ -73,6 +73,14 @@ for d in \
     chown "${TARGET_USER}:${TARGET_GROUP}" "$d" 2>/dev/null || true
 done
 
+# XDG_RUNTIME_DIR: spec requires 0700, owned solely by the user.
+_xdg_runtime="/run/user/$(id -u "${TARGET_USER}")"
+mkdir -p "${_xdg_runtime}"
+chown "${TARGET_USER}:${TARGET_GROUP}" "${_xdg_runtime}"
+chmod 0700 "${_xdg_runtime}"
+export XDG_RUNTIME_DIR="${_xdg_runtime}"
+unset _xdg_runtime
+
 # ---- Materialise pixi environment from ${WORKSPACE_DIR}/pixi.toml -----------
 # Runs as the target (non-root) user so that .pixi/ is owned by them.
 #

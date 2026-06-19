@@ -98,6 +98,16 @@ if [ -n "${DOPPLER_TOKEN:-}" ] && command -v doppler >/dev/null 2>&1; then
     unset _doppler_env DOPPLER_TOKEN
 fi
 
+# XDG_RUNTIME_DIR: required by GUI apps (MuJoCo viewer, EGL). Spec mandates 0700.
+# Prefer /run/user/<uid> (created by entrypoint.sh as root); fall back to /tmp
+# for exec'd shells where the /run path may not exist yet.
+if [[ -d "/run/user/$(id -u)" ]]; then
+    export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+else
+    export XDG_RUNTIME_DIR="/tmp/runtime-${USER}"
+    [[ -d "${XDG_RUNTIME_DIR}" ]] || { mkdir -p "${XDG_RUNTIME_DIR}" && chmod 0700 "${XDG_RUNTIME_DIR}"; }
+fi
+
 # Pixi-managed Python: make python/pip/etc. resolve in non-interactive shells
 # (postCreateCommand, scripts) where ~/.zshrc's pixi shell-hook does not run.
 [[ -d "${WORKSPACE_DIR}/.pixi/envs/default/bin" ]] && export PATH="${WORKSPACE_DIR}/.pixi/envs/default/bin:${PATH}"
