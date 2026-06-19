@@ -119,3 +119,23 @@ ruff check / ruff format ともにクリーン.
 `.devcontainer/Dockerfile` の `/etc/zsh/zshenv` heredoc に `${WORKSPACE_DIR}/.pixi/envs/default/bin` を追加した (既存の `~/.local/bin` の前に挿入). `zshenv` はインタラクティブ・非インタラクティブ問わず全 zsh コンテキストで読み込まれるため, `python` コマンドが全ての実行環境で解決できるようになった.
 
 `devcontainer.json` の `postCreateCommand` はそのまま `python --version` を維持 (絶対パス不要).
+
+---
+
+## 2026-06-19 — devcontainer 環境修正と雑整理
+
+### XDG_RUNTIME_DIR 警告の修正
+
+MuJoCo の GUI/EGL レンダリング起動時に "XDG_RUNTIME_DIR is invalid or not set" 警告が出ていた.
+
+`.devcontainer/entrypoint.sh` に root として `/run/user/<uid>` を 0700 で作成するブロックを追加した.
+`docker exec` 経由のシェル (entrypoint.sh を経由しない) への対処として, `.devcontainer/Dockerfile` の `/etc/zsh/zshenv` heredoc に `/tmp` フォールバック付きの `XDG_RUNTIME_DIR` 設定を追加した.
+
+### README の pip install -e . 削除
+
+セットアップ手順から `pip install -e .` を削除した.
+pixi が `[pypi-dependencies]` の editable install を管理しており, pixi 環境内で pip は使用不可のため, 手順として誤りだった.
+
+### results/ を .gitignore に追加
+
+シミュレーション出力ディレクトリ `results/` が未追跡かつ未 ignore の状態だったため `.gitignore` に追加した.
