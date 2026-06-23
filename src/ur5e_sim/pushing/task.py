@@ -25,7 +25,7 @@ from ur5e_sim.pushing.io import Log, create_trial_dir, dump_config
 from ur5e_sim.pushing.kinematics import R_TOOL0_DES, pusher_in_slider_body, slider_pose_from_data
 from ur5e_sim.pushing.mpc import PusherSliderMPC
 
-# gripper_pinch sits PINCH_TO_PAD_FRONT behind the closed pad front face (the
+# pinch sits PINCH_TO_PAD_FRONT behind the closed pad front face (the
 # surface that actually contacts the slider). The keyframe starts the pad ~7 mm
 # clear of the slider face, so settling leaves the slider undisturbed.
 PINCH_TO_PAD_FRONT = 0.011  # measured at closed + vertical pose (y 0.469->0.480)
@@ -81,17 +81,17 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
     m = mujoco.MjModel.from_xml_path(cfg.scene_path)
     d = mujoco.MjData(m)
 
-    tip_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "gripper_pinch")
+    tip_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "pinch")
     tool0_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "attachment_site")
     slider_body_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "slider")
     key_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_KEY, "ready")
     pad_geom_ids = [
         mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, name)
         for name in [
-            "gripper_right_pad1",
-            "gripper_right_pad2",
-            "gripper_left_pad1",
-            "gripper_left_pad2",
+            "right_pad1",
+            "right_pad2",
+            "left_pad1",
+            "left_pad2",
         ]
     ]
     slider_geom_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, "slider_geom")
@@ -148,6 +148,7 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
 
     log = Log()
     t_start = d.time
+    y_start = d.xpos[slider_body_id][1]
     step_count = 0
     mpc_call_time_total = 0.0
     tip_z_ref = d.site_xpos[tip_site_id][2]
@@ -178,10 +179,10 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
 
         done = False
         if slider_pos[1] >= cfg.push.y_goal:
-            print(f"Goal reached: slider_y={slider_pos[1]:.4f} >= {cfg.push.y_goal}")
+            print(f"\nGoal reached: slider_y={slider_pos[1]:.4f} >= {cfg.push.y_goal}")
             done = True
         elif d.time - t_start > cfg.push.max_sim_time:
-            print(f"Max time reached: {cfg.push.max_sim_time}s")
+            print(f"\nMax time reached: {cfg.push.max_sim_time}s")
             done = True
         if done:
             log.vn.append(0.0)
@@ -191,7 +192,7 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
 
         # The closed gripper is mechanically symmetric and aims to push through the
         # slider centerline, so the intended tangential contact offset is ~0. Measuring
-        # it from gripper_pinch (~40 mm behind the contact along the face normal) leaks
+        # it from pinch (~40 mm behind the contact along the face normal) leaks
         # sin(theta)*standoff into px when the slider rotates; that spurious off-center
         # offset makes the MPC predict straight pushing adds +theta and collapse to u=0.
         # Feed the intended centered contact instead. Lateral drift is still corrected
@@ -241,11 +242,14 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
             renderer.capture(d)
 
         step_count += 1
-        if step_count % 100 == 0:
+        if step_count % 10 == 0:
+            progress = (slider_pos[1] - y_start) / (cfg.push.y_goal - y_start) * 100
             print(
-                f"  t={d.time:.2f}s  slider=({slider_pos[0]:.4f}, {slider_pos[1]:.4f}) "
-                f"theta={np.degrees(slider_theta):.2f}deg  "
-                f"vn={vn:.4f} vt={vt:.4f}  contacts={d.ncon}"
+                f"\r  [{progress:5.1f}%] t={d.time:.2f}s  "
+                f"slider=({slider_pos[0]:.4f}, {slider_pos[1]:.4f})  "
+                f"vn={vn:.4f}  contacts={d.ncon}  ",
+                end="",
+                flush=True,
             )
 
     renderer.close()
