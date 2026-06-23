@@ -1,7 +1,7 @@
 """Compute a ready keyframe for the UR5e + Robotiq 2F-85 gripper.
 
 Uses 6-DOF damped-pseudoinverse IK (position + tool0 orientation) to place
-the gripper as a vertical pusher: gripper_pinch behind the slider's -y face
+the gripper as a vertical pusher: pinch behind the slider's -y face
 on the work surface, with tool0 held straight down (R_TOOL0_DES) so the closed
 finger axis is perpendicular to the push direction. The orientation constraint
 and Jacobian helpers are shared with the runtime execution layer so the generated
@@ -64,7 +64,7 @@ def solve_ik(
     max_step: float = 0.05,
     damping: float = 1e-3,
 ) -> tuple[np.ndarray, float, float]:
-    """6-DOF IK: drive gripper_pinch to target_pos and tool0 to R_TOOL0_DES.
+    """6-DOF IK: drive pinch to target_pos and tool0 to R_TOOL0_DES.
 
     Returns (arm_qpos, pos_err_m, ori_err_rad).
     """
@@ -135,7 +135,7 @@ def main() -> None:
     m = mujoco.MjModel.from_xml_path(paths.scene_path())
     d = mujoco.MjData(m)
 
-    tip_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "gripper_pinch")
+    tip_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "pinch")
     ori_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "attachment_site")
     base_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "base")
 
@@ -147,7 +147,7 @@ def main() -> None:
     gripper_qpos = close_gripper_sim(m, d)
 
     # Target: pinch retracted so the closed pad front stops ~7 mm clear of the
-    # slider's -y face. gripper_pinch sits PINCH_TO_PAD_FRONT behind the pad
+    # slider's -y face. pinch sits PINCH_TO_PAD_FRONT behind the pad
     # front, so pinch target = face - CLEARANCE - PINCH_TO_PAD_FRONT.
     # (face 0.470 - 0.007 - 0.011 = 0.452). This keeps the gravity settle in
     # the push run from ramming the slider before the approach phase.

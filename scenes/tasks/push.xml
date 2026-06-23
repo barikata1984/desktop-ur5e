@@ -24,37 +24,37 @@
     <exclude body1="wrist_1_link" body2="table"/>
     <exclude body1="wrist_2_link" body2="table"/>
     <exclude body1="wrist_3_link" body2="table"/>
-    <exclude body1="gripper" body2="table"/>
-    <exclude body1="gripper_base_mount" body2="table"/>
+    <exclude body1="gripper_mount" body2="table"/>
+    <exclude body1="base_mount" body2="table"/>
     <exclude body1="gripper_base" body2="table"/>
-    <exclude body1="gripper_right_driver" body2="table"/>
-    <exclude body1="gripper_right_coupler" body2="table"/>
-    <exclude body1="gripper_right_spring_link" body2="table"/>
-    <exclude body1="gripper_right_follower" body2="table"/>
-    <exclude body1="gripper_right_pad" body2="table"/>
-    <exclude body1="gripper_left_driver" body2="table"/>
-    <exclude body1="gripper_left_coupler" body2="table"/>
-    <exclude body1="gripper_left_spring_link" body2="table"/>
-    <exclude body1="gripper_left_follower" body2="table"/>
-    <exclude body1="gripper_left_pad" body2="table"/>
+    <exclude body1="right_driver" body2="table"/>
+    <exclude body1="right_coupler" body2="table"/>
+    <exclude body1="right_spring_link" body2="table"/>
+    <exclude body1="right_follower" body2="table"/>
+    <exclude body1="right_pad" body2="table"/>
+    <exclude body1="left_driver" body2="table"/>
+    <exclude body1="left_coupler" body2="table"/>
+    <exclude body1="left_spring_link" body2="table"/>
+    <exclude body1="left_follower" body2="table"/>
+    <exclude body1="left_pad" body2="table"/>
 
     <!-- Same wrist/gripper exclusions vs the work surface (arm operates above it) -->
     <exclude body1="wrist_1_link" body2="work_surface"/>
     <exclude body1="wrist_2_link" body2="work_surface"/>
     <exclude body1="wrist_3_link" body2="work_surface"/>
-    <exclude body1="gripper" body2="work_surface"/>
-    <exclude body1="gripper_base_mount" body2="work_surface"/>
+    <exclude body1="gripper_mount" body2="work_surface"/>
+    <exclude body1="base_mount" body2="work_surface"/>
     <exclude body1="gripper_base" body2="work_surface"/>
-    <exclude body1="gripper_right_driver" body2="work_surface"/>
-    <exclude body1="gripper_right_coupler" body2="work_surface"/>
-    <exclude body1="gripper_right_spring_link" body2="work_surface"/>
-    <exclude body1="gripper_right_follower" body2="work_surface"/>
-    <exclude body1="gripper_right_pad" body2="work_surface"/>
-    <exclude body1="gripper_left_driver" body2="work_surface"/>
-    <exclude body1="gripper_left_coupler" body2="work_surface"/>
-    <exclude body1="gripper_left_spring_link" body2="work_surface"/>
-    <exclude body1="gripper_left_follower" body2="work_surface"/>
-    <exclude body1="gripper_left_pad" body2="work_surface"/>
+    <exclude body1="right_driver" body2="work_surface"/>
+    <exclude body1="right_coupler" body2="work_surface"/>
+    <exclude body1="right_spring_link" body2="work_surface"/>
+    <exclude body1="right_follower" body2="work_surface"/>
+    <exclude body1="right_pad" body2="work_surface"/>
+    <exclude body1="left_driver" body2="work_surface"/>
+    <exclude body1="left_coupler" body2="work_surface"/>
+    <exclude body1="left_spring_link" body2="work_surface"/>
+    <exclude body1="left_follower" body2="work_surface"/>
+    <exclude body1="left_pad" body2="work_surface"/>
 
     <!-- Slider-table: mu=0.35, condim=4 for torsional friction (Hogan 2016) -->
     <pair geom1="slider_geom" geom2="table_surface" condim="4"
@@ -67,16 +67,16 @@
       solref="0.02 1" solimp="0.9 0.95 0.001 0.5 2"/>
 
     <!-- Gripper pad vs slider: mu=0.3, condim=4 (Hogan 2016 pusher-slider) -->
-    <pair geom1="gripper_right_pad1" geom2="slider_geom" condim="4"
+    <pair geom1="right_pad1" geom2="slider_geom" condim="4"
       friction="0.3 0.3 0.005 0.001 0.001"
       solref="0.004 1" solimp="0.95 0.99 0.001 0.5 2"/>
-    <pair geom1="gripper_right_pad2" geom2="slider_geom" condim="4"
+    <pair geom1="right_pad2" geom2="slider_geom" condim="4"
       friction="0.3 0.3 0.005 0.001 0.001"
       solref="0.004 1" solimp="0.95 0.99 0.001 0.5 2"/>
-    <pair geom1="gripper_left_pad1" geom2="slider_geom" condim="4"
+    <pair geom1="left_pad1" geom2="slider_geom" condim="4"
       friction="0.3 0.3 0.005 0.001 0.001"
       solref="0.004 1" solimp="0.95 0.99 0.001 0.5 2"/>
-    <pair geom1="gripper_left_pad2" geom2="slider_geom" condim="4"
+    <pair geom1="left_pad2" geom2="slider_geom" condim="4"
       friction="0.3 0.3 0.005 0.001 0.001"
       solref="0.004 1" solimp="0.95 0.99 0.001 0.5 2"/>
   </contact>
