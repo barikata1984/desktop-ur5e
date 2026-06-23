@@ -1,0 +1,34 @@
+<mujoco model="trajectory_design">
+  <!--
+    Trajectory design scene: UR5e + FT300s + Robotiq 2F-85 on the shared environment.
+    No task objects. Uses FT300s robot without identification payload.
+  -->
+  <compiler angle="radian" autolimits="true"/>
+
+  <include file="../common/environment.xml"/>
+  <include file="../common/robots/ur5e_ft300s_gripper_no_payload.xml"/>
+
+  <contact>
+    <exclude body1="base" body2="table"/>
+    <exclude body1="wrist_1_link" body2="table"/>
+    <exclude body1="wrist_2_link" body2="table"/>
+    <exclude body1="wrist_3_link" body2="table"/>
+    <exclude body1="ft300s_mount" body2="table"/>
+    <exclude body1="gripper_mount" body2="table"/>
+    <exclude body1="base_mount" body2="table"/>
+    <exclude body1="gripper_base" body2="table"/>
+    <exclude body1="wrist_1_link" body2="work_surface"/>
+    <exclude body1="wrist_2_link" body2="work_surface"/>
+    <exclude body1="wrist_3_link" body2="work_surface"/>
+    <exclude body1="ft300s_mount" body2="work_surface"/>
+    <exclude body1="gripper_mount" body2="work_surface"/>
+    <exclude body1="base_mount" body2="work_surface"/>
+    <exclude body1="gripper_base" body2="work_surface"/>
+  </contact>
+
+  <keyframe>
+    <key name="home"
+      qpos="1.3632 -1.0768 1.6253 -2.1193 -1.5708 -0.2076 0 0 0 0 0 0 0 0"
+      ctrl="1.3632 -1.0768 1.6253 -2.1193 -1.5708 -0.2076 0"/>
+  </keyframe>
+</mujoco>
