@@ -8,3 +8,5 @@
 - [x] scripts/ と configs/ の作成
 - [x] テストの移行と全体検証
 - [x] devcontainer postCreateCommand の `python --version` 失敗を修正
+- [x] インタラクティブ軌道設計ツール (IK ベースコーンスイープ) の実装
+- [ ] ロボット XML をペイロードのオプション化でリファクタリング (ur5e_ft300s_gripper_no_payload.xml の重複解消)
