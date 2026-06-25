@@ -47,3 +47,19 @@ PusherSliderMPC はこのシグネチャと異なるため, アダプタ control
 
 import パスの書き換えが主で, ロジック変更は最小限に収まった.
 pusher_slider/sim/runner.py の monolithic run() は SimRunner + PushTask に分解した.
+
+## モデルビルダー (2026-06-25 追加)
+
+MuJoCo モデルの組み立てを monolithic XML から `MjSpec.attach()` ベースの Python コードへ移行した.
+
+### 設計決定
+
+- `src/ur5e_sim/core/model_builder.py` に `build_ur5e_model()` を実装
+- Menagerie の `ur5e.xml` と `2f85.xml` をそのまま参照 (コピーしない)
+- FT300s は `scenes/common/sensors/ft300s.xml` としてスタンドアロン XML を新設
+- オフセット値 (attachment_site=0.094 m, gripper_base_mount=0.004 m) は XML ではなく model_builder.py で実行時に上書き
+- 全同定パイプラインスクリプトは `build_ur5e_model()` でモデルをロードする
+
+### 残課題
+
+push migration plan (`notes/PLAN_push_model_builder_migration.md`) に従い, pushing/ スクリプト群の移行が未実施.
