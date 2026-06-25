@@ -88,8 +88,11 @@ def _build_spec(
     spec.attach(env, prefix="env_", site=env_site)
 
     # --- 7. Position UR5e base on table ---
+    # Menagerie ur5e.xml has quat="0 0 0 -1" (180° about z) on the base body.
+    # Override to identity to match the project convention (y-axis toward workspace).
     base = spec.body("base")
     base.pos = [0.0, 0.1, 0.3]
+    base.quat = [1.0, 0.0, 0.0, 0.0]
 
     # --- 8. Update home keyframe for the extended qpos/ctrl ---
     _update_home_keyframe(spec)
