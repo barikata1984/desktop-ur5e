@@ -1,0 +1,46 @@
+<mujoco model="ft300s">
+  <!--
+    Robotiq FT300s force/torque sensor, standalone for MjSpec.attach().
+    Loaded via MjSpec.from_xml_path(); mesh path is resolved relative to
+    THIS file's directory (scenes/common/sensors/).
+
+    On attach(), ft300s_mount's pos/quat are overridden by the attachment
+    site frame, so they are zero/identity here.
+
+    ft300s_mount (z=0): robot-side flange; houses the 0.3 kg sensor body.
+    gripper_mount (z=0.0422): tool-side, zero-mass measurement boundary.
+    The ft_sensor force/torque sensor lives on gripper_mount so its subtree
+    load excludes the FT300s housing mass, matching the real sensing element
+    that sits between the two flanges. Attach the gripper to tool_output.
+  -->
+  <compiler angle="radian"/>
+
+  <default>
+    <default class="ft300s">
+      <mesh scale="0.001 0.001 0.001"/>
+    </default>
+  </default>
+
+  <asset>
+    <material name="ft300s_body" rgba="0.15 0.15 0.15 1" specular="0.3" shininess="0.4"/>
+    <mesh class="ft300s" name="ft300s" file="../../../assets/ft300s/ft300s.stl"/>
+  </asset>
+
+  <worldbody>
+    <body name="ft300s_mount" pos="0 0 0" quat="1 0 0 0">
+      <inertial mass="0.300" pos="0 0 0.0211" diaginertia="0.000193 0.000193 0.000297"/>
+      <geom type="mesh" mesh="ft300s" material="ft300s_body" pos="0 0 0.0422" quat="0 1 0 0"
+        contype="0" conaffinity="0" group="2"/>
+      <geom type="cylinder" size="0.0375 0.0211" pos="0 0 0.0211" group="3"/>
+      <body name="gripper_mount" pos="0 0 0.0422">
+        <site name="ft_sensor" pos="0 0 0" size="0.01"/>
+        <site name="tool_output" pos="0 0 0" size="0.001"/>
+      </body>
+    </body>
+  </worldbody>
+
+  <sensor>
+    <force name="ft_force" site="ft_sensor"/>
+    <torque name="ft_torque" site="ft_sensor"/>
+  </sensor>
+</mujoco>
