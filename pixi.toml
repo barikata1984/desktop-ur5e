@@ -8,13 +8,6 @@ platforms = ["linux-64"]
 exclude-newer = "7d"
 
 [tasks]
-build = "docker compose -f .devcontainer/docker-compose.yaml build"
-up = "docker compose -f .devcontainer/docker-compose.yaml up -d"
-shell = "docker compose -f .devcontainer/docker-compose.yaml exec dev zsh"
-down = "docker compose -f .devcontainer/docker-compose.yaml down"
-logs = "docker compose -f .devcontainer/docker-compose.yaml logs -f"
-
-# Simulation tasks (run inside the container)
 push = "python scripts/run_push.py"
 identify = "python scripts/run_identification.py"
 keyframe = "python scripts/make_keyframe.py"
