@@ -16,7 +16,7 @@ import numpy as np
 import tyro
 import yaml
 
-from ur5e_sim.core.env import load_model, reset_to_home
+from ur5e_sim.core.model_builder import build_ur5e_model
 from ur5e_sim.identification.estimators import (
     BatchLeastSquares,
     BatchLSConfig,
@@ -153,12 +153,11 @@ def main() -> None:
     trajectory = result_to_trajectory(opt_result)
     print(f"Trajectory: {len(trajectory.time)} steps, duration={trajectory.time[-1]:.2f}s")
 
-    loaded = load_model(config.model)
-    reset_to_home(loaded.model, loaded.data)
-    print(f"Loaded model: {loaded.model_path}")
+    model, data = build_ur5e_model()
+    print("Built identification model via MjSpec")
 
     body_name = opt_result.config.body_name
-    true_params_obj = body_inertial_parameters_from_model(loaded.model, body_name)
+    true_params_obj = body_inertial_parameters_from_model(model, body_name)
     true_phi = true_params_obj.to_vector()
     print(f"True parameters for '{body_name}': mass={true_params_obj.mass:.6f} kg")
 
@@ -172,13 +171,13 @@ def main() -> None:
     )
     rng = np.random.default_rng(42) if config.noise_std > 0 else None
 
-    playback = TrajectoryPlayback(loaded.model, loaded.data, playback_config)
+    playback = TrajectoryPlayback(model, data, playback_config)
     print("Executing trajectory playback...")
     buffer = playback.execute(trajectory, rng=rng)
     print(f"Collected {len(buffer)} samples")
 
     print("Building regressor matrices...")
-    A, y_vec = buffer.build_regressor_data(loaded.model, loaded.data, body_name)
+    A, y_vec = buffer.build_regressor_data(model, data, body_name)
     print(f"Regressor shape: A={A.shape}, y={y_vec.shape}")
 
     print(f"Running estimator: {config.estimator}")

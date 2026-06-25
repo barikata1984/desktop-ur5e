@@ -55,7 +55,7 @@ class OptimizerConfig:
     with_ft_offset: bool = False
     ft_offset_column_scale: bool = True
     n_workers: int = 1  # Number of parallel worker processes (1 = sequential)
-    model_path: str | None = None  # XML path for worker processes to load model
+    model_path: str | None = None  # Unused; workers build model via build_ur5e_model()
 
     def __post_init__(self) -> None:
         if self.q0 is None:
@@ -213,19 +213,17 @@ def _compute_fourier_bounds_static(cfg: OptimizerConfig) -> Bounds | None:
 
 
 def _run_single_restart(
-    model_path: str,
     config: OptimizerConfig,
     x0: np.ndarray,
     restart_index: int,
 ) -> _RestartResult:
     """Run a single restart in a worker process.
 
-    Loads its own MjModel/MjData to ensure thread safety.
+    Builds its own MjModel/MjData via MjSpec.attach() to ensure process safety.
     """
-    from ur5e_sim.core.env import load_model
+    from ur5e_sim.core.model_builder import build_ur5e_model
 
-    loaded = load_model(model_path)
-    model, data = loaded.model, loaded.data
+    model, data = build_ur5e_model()
 
     cache, constraints = _build_cache_and_constraints_static(config, model, data)
     fourier_bounds = _compute_fourier_bounds_static(config)
@@ -674,10 +672,6 @@ class ExcitationOptimizer:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
         cfg = self.config
-        if not cfg.model_path:
-            raise ValueError(
-                "OptimizerConfig.model_path is required for parallel mode (n_workers>1)"
-            )
 
         wb_enabled = wandb_config is not None and wandb_config.enabled
         wb_group = wandb_config.run_name or f"opt-{int(time.time())}" if wb_enabled else ""
@@ -702,7 +696,6 @@ class ExcitationOptimizer:
             for i in range(cfg.n_monte_carlo):
                 future = executor.submit(
                     _run_single_restart,
-                    cfg.model_path,
                     cfg,
                     all_x0[i],
                     i,

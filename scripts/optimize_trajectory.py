@@ -13,7 +13,8 @@ import numpy as np
 import tyro
 import yaml
 
-from ur5e_sim.core.env import get_named_object_id, load_model, reset_to_home
+from ur5e_sim.core.env import get_named_object_id
+from ur5e_sim.core.model_builder import build_ur5e_model
 from ur5e_sim.identification.collision import CollisionConfig
 from ur5e_sim.identification.io import (
     result_to_trajectory,
@@ -29,7 +30,6 @@ from ur5e_sim.identification.optimizer import (
 from ur5e_sim.identification.workspace import EeVelocityConfig, WorkspaceConstraintConfig
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_DEFAULT_SCENE = str(_REPO_ROOT / "scenes" / "tasks" / "identification.xml")
 _DEFAULT_CONFIG = _REPO_ROOT / "configs" / "identification_default.yaml"
 
 
@@ -37,7 +37,7 @@ _DEFAULT_CONFIG = _REPO_ROOT / "configs" / "identification_default.yaml"
 class OptimizeExcitationConfig:
     """Configuration for excitation trajectory optimization."""
 
-    model: str = _DEFAULT_SCENE
+    model: str = ""  # Unused: model is now built by build_ur5e_model()
     num_harmonics: int = 5
     base_freq: float = 0.2
     duration: float = 5.0
@@ -122,9 +122,8 @@ def _build_config() -> OptimizeExcitationConfig:
 def main() -> None:
     config = _build_config()
 
-    loaded = load_model(config.model)
-    reset_to_home(loaded.model, loaded.data)
-    q0 = np.array(loaded.data.qpos[: loaded.model.nq], dtype=np.float64)
+    model, data = build_ur5e_model()
+    q0 = np.array(data.qpos[:6], dtype=np.float64)
 
     workspace_config: WorkspaceConstraintConfig | None = None
     if config.max_displacement > 0:
@@ -136,14 +135,12 @@ def main() -> None:
 
     payload_workspace_config: WorkspaceConstraintConfig | None = None
     if config.enable_payload_workspace:
-        geom_id = get_named_object_id(
-            loaded.model, mujoco.mjtObj.mjOBJ_GEOM, "workspace_region_geom"
-        )
+        geom_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_GEOM, "workspace_region_geom")
         if geom_id is not None:
-            body_id = loaded.model.geom_bodyid[geom_id]
-            mujoco.mj_kinematics(loaded.model, loaded.data)
-            center = loaded.data.xpos[body_id].copy()
-            half = loaded.model.geom_size[geom_id].copy()
+            body_id = model.geom_bodyid[geom_id]
+            mujoco.mj_kinematics(model, data)
+            center = data.xpos[body_id].copy()
+            half = model.geom_size[geom_id].copy()
             box_lower = center - half
             box_upper = center + half
             print(f"  payload workspace bounds: {box_lower} .. {box_upper}")
@@ -194,10 +191,10 @@ def main() -> None:
         with_ft_offset=config.with_ft_offset,
         ft_offset_column_scale=config.ft_offset_column_scale,
         n_workers=config.n_workers,
-        model_path=str(loaded.model_path) if config.n_workers > 1 else None,
+        model_path=None,
     )
 
-    optimizer = ExcitationOptimizer(config=opt_config, model=loaded.model, data=loaded.data)
+    optimizer = ExcitationOptimizer(config=opt_config, model=model, data=data)
 
     wandb_cfg = WandbConfig(
         enabled=config.wandb,

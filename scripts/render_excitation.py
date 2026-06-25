@@ -10,17 +10,14 @@ import mujoco
 import numpy as np
 import tyro
 
-from ur5e_sim.core.env import load_model, reset_to_home
+from ur5e_sim.core.model_builder import build_ur5e_model
 from ur5e_sim.core.renderer import add_ee_frame_overlay
 from ur5e_sim.identification.io import load_optimization_result, result_to_trajectory
-
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-_DEFAULT_SCENE = str(_REPO_ROOT / "scenes" / "tasks" / "identification.xml")
 
 
 @dataclass
 class RenderPlaybackConfig:
-    model: str = _DEFAULT_SCENE
+    model: str = ""  # kept for backwards compat; unused (build_ur5e_model used instead)
     result_json: str = "results/excitation_result.json"
     output: str = "results/excitation_playback.mp4"
     width: int = 960
@@ -64,9 +61,7 @@ def main() -> None:
     n_steps = len(trajectory.time)
     print(f"Trajectory: {n_steps} steps, {duration:.1f}s, {traj_fps:.0f} fps")
 
-    loaded = load_model(config.model)
-    reset_to_home(loaded.model, loaded.data)
-    model, data = loaded.model, loaded.data
+    model, data = build_ur5e_model()
 
     tile_w = min(config.width, int(model.vis.global_.offwidth))
     tile_h = min(config.height, int(model.vis.global_.offheight))
