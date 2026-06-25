@@ -191,7 +191,7 @@
                          static Fz = -m_gripper * g  (site z points toward tool)
                        Real FT convention (child→parent, load on flange):
                          negate all 6 components → static Fz = +m_gripper * g  -->
-                  <body name="ft300s_mount" pos="0 0.094 0" quat="-1 1 0 0">
+                  <body name="ft300s_mount" pos="0 0.1 0" quat="-1 1 0 0">
                     <inertial mass="0.300" pos="0 0 0.0211"
                       diaginertia="0.000193 0.000193 0.000297"/>
                     <geom type="mesh" mesh="ft300s" material="ft300s_body" pos="0 0 0.0422" quat="0 1 0 0"
@@ -199,8 +199,6 @@
                     <geom type="cylinder" size="0.0375 0.0211" pos="0 0 0.0211" group="3"/>
                     <body name="gripper_mount" pos="0 0 0.0422" childclass="2f85">
                       <site name="ft_sensor" pos="0 0 0" size="0.01"/>
-                      <!-- Identification payload: rigid child of the EE subtree
-                           seen by ft_sensor. Bare-body fragment inlined here. -->
                       <include file="../objects/payload_box.xml"/>
                       <body name="base_mount" pos="0 0 0.007">
                         <geom class="gripper_visual" mesh="gripper_base_mount" material="gripper_black"/>
