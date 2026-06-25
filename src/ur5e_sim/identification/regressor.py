@@ -232,6 +232,20 @@ def compute_stacked_body_regressor(
     dq_array = np.asarray(dq, dtype=np.float64)
     ddq_array = np.asarray(ddq, dtype=np.float64)
 
+    # Pad trajectory columns when model has more DoFs than the trajectory
+    # (e.g. 6-joint arm trajectory on a 14-DoF model with gripper joints).
+    if q_array.ndim == 2 and q_array.shape[1] < model.nq:
+        n_steps = q_array.shape[0]
+        q_pad = np.zeros((n_steps, model.nq), dtype=np.float64)
+        q_pad[:, : q_array.shape[1]] = q_array
+        q_array = q_pad
+        dq_pad = np.zeros((n_steps, model.nv), dtype=np.float64)
+        dq_pad[:, : dq_array.shape[1]] = dq_array
+        dq_array = dq_pad
+        ddq_pad = np.zeros((n_steps, model.nv), dtype=np.float64)
+        ddq_pad[:, : ddq_array.shape[1]] = ddq_array
+        ddq_array = ddq_pad
+
     if q_array.ndim != 2 or q_array.shape[1] != model.nq:
         raise ValueError(f"q must have shape (N, {model.nq})")
     if dq_array.shape != (q_array.shape[0], model.nv):

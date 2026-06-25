@@ -10,6 +10,15 @@ from ur5e_sim.core.env import get_named_object_id
 from ur5e_sim.identification.constraints import _TrajectoryCache
 
 
+def _pad_qpos(q_row: np.ndarray, nq: int) -> np.ndarray:
+    """Zero-pad a joint-space vector to match model nq if shorter."""
+    if q_row.shape[-1] >= nq:
+        return q_row
+    padded = np.zeros(nq, dtype=np.float64)
+    padded[: q_row.shape[-1]] = q_row
+    return padded
+
+
 @dataclass(frozen=True)
 class WorkspaceConstraintConfig:
     max_displacement: float = 0.5
@@ -40,7 +49,7 @@ def _evaluate_workspace_positions(
     positions = np.zeros((n_steps, 3), dtype=np.float64)
 
     for i in range(n_steps):
-        data.qpos[:] = q_trajectory[i]
+        data.qpos[:] = _pad_qpos(q_trajectory[i], model.nq)
         mujoco.mj_kinematics(model, data)
         positions[i] = data.site_xpos[site_id].copy()
 
@@ -197,7 +206,7 @@ def _evaluate_payload_surface_points(
     world_points = np.zeros((n_steps, n_points, 3), dtype=np.float64)
 
     for i in range(n_steps):
-        data.qpos[:] = q_trajectory[i]
+        data.qpos[:] = _pad_qpos(q_trajectory[i], model.nq)
         mujoco.mj_kinematics(model, data)
         body_pos = data.xpos[geom_body_id]
         body_rot = data.xmat[geom_body_id].reshape(3, 3)
@@ -270,11 +279,11 @@ def _evaluate_ee_linear_velocity(
     jacp = np.zeros((3, nv), dtype=np.float64)
 
     for i in range(n_steps):
-        data.qpos[:] = q_trajectory[i]
+        data.qpos[:] = _pad_qpos(q_trajectory[i], model.nq)
         mujoco.mj_kinematics(model, data)
         jacp[:] = 0.0
         mujoco.mj_jacSite(model, data, jacp, None, site_id)
-        linear_vel = jacp @ dq_trajectory[i]
+        linear_vel = jacp @ _pad_qpos(dq_trajectory[i], nv)
         speeds[i] = np.linalg.norm(linear_vel)
 
     return speeds

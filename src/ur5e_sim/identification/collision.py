@@ -153,7 +153,14 @@ class CollisionChecker:
         # live on a nested child body (red block), so track the geom's own parent
         # body id for correct pose evaluation.
         if self.config.payload_half_extents is not None and self.config.payload_offset is not None:
-            self._payload_body_id = payload_id
+            # Use payload_box_mount if it exists, otherwise fall back to
+            # gripper_mount as the reference body for the virtual payload box.
+            if payload_id is not None:
+                self._payload_body_id = payload_id
+            else:
+                self._payload_body_id = get_named_object_id(
+                    model, mujoco.mjtObj.mjOBJ_BODY, "gripper_mount"
+                )
             self._payload_half_extents = np.array(
                 self.config.payload_half_extents, dtype=np.float64
             )
@@ -174,7 +181,12 @@ class CollisionChecker:
 
     def _run_kinematics(self, q: np.ndarray) -> None:
         """Set qpos and run forward kinematics (once)."""
-        self.data.qpos[:] = q
+        if q.shape[0] < self.model.nq:
+            padded = np.zeros(self.model.nq, dtype=np.float64)
+            padded[: q.shape[0]] = q
+            self.data.qpos[:] = padded
+        else:
+            self.data.qpos[:] = q
         mujoco.mj_kinematics(self.model, self.data)
 
     def _get_link_positions(self) -> np.ndarray:
