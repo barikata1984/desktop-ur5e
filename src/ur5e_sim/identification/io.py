@@ -22,6 +22,7 @@ def save_optimization_result(
         "feasible": result.feasible,
         "constraint_margins": result.constraint_margins,
         "trajectory_stats": result.trajectory_stats,
+        "restart_history": result.restart_history,
         "a_opt": result.a_opt.tolist(),
         "b_opt": result.b_opt.tolist(),
         "q0": result.q0.tolist(),
@@ -94,6 +95,7 @@ def load_optimization_result(path: str | Path) -> OptimizationResult:
         wall_time=float(payload["wall_time"]),
         n_restarts=int(payload["n_restarts"]),
         best_start_index=int(payload["best_start_index"]),
+        restart_history=payload.get("restart_history", []),
     )
 
 

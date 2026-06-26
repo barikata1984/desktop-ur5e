@@ -100,6 +100,7 @@ class OptimizationResult:
     constraint_margins: dict[str, float] = field(default_factory=dict)
     feasible: bool = False
     trajectory_stats: dict[str, float] = field(default_factory=dict)
+    restart_history: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -248,6 +249,7 @@ def _run_single_restart(
                 config.subsample_factor,
                 with_ft_offset=config.with_ft_offset,
                 column_scale=column_scale,
+                site_name=config.site_name,
             )
         else:
             obj_val = condition_number_objective(
@@ -259,6 +261,7 @@ def _run_single_restart(
                 config.subsample_factor,
                 with_ft_offset=config.with_ft_offset,
                 column_scale=column_scale,
+                site_name=config.site_name,
             )
             cond_val = obj_val
         _latest_obj[0] = obj_val
@@ -301,6 +304,7 @@ def _run_single_restart(
             config.subsample_factor,
             with_ft_offset=config.with_ft_offset,
             column_scale=column_scale,
+            site_name=config.site_name,
         )
     else:
         cond = float(result.fun)
@@ -512,6 +516,7 @@ class ExcitationOptimizer:
                     cfg.subsample_factor,
                     with_ft_offset=cfg.with_ft_offset,
                     column_scale=_column_scale,
+                    site_name=cfg.site_name,
                 )
             else:
                 cond_val = condition_number_objective(
@@ -523,6 +528,7 @@ class ExcitationOptimizer:
                     cfg.subsample_factor,
                     with_ft_offset=cfg.with_ft_offset,
                     column_scale=_column_scale,
+                    site_name=cfg.site_name,
                 )
                 obj_val = cond_val
             _latest_obj[0] = obj_val
@@ -533,6 +539,7 @@ class ExcitationOptimizer:
         best_cond = float("inf")
         best_idx = 0
         total_evals = 0
+        restart_summaries: list[dict] = []
 
         t0 = time.perf_counter()
 
@@ -540,6 +547,7 @@ class ExcitationOptimizer:
         for i in range(cfg.n_monte_carlo):
             x0 = all_x0[i]
             iter_in_restart = [0]
+            iter_logs: list[dict[str, float]] = []
             restart_t0 = time.perf_counter()
 
             # Per-restart wandb run
@@ -549,6 +557,12 @@ class ExcitationOptimizer:
 
             def _callback(xk: np.ndarray) -> None:
                 iter_in_restart[0] += 1
+                log_entry = {
+                    "iter/condition_number": _latest_cond[0],
+                    "iter/objective": _latest_obj[0],
+                    "iter/wall_time": time.perf_counter() - restart_t0,
+                }
+                iter_logs.append(log_entry)
                 if wb_run is not None:
                     wb_run.log(
                         {
@@ -584,6 +598,7 @@ class ExcitationOptimizer:
                     cfg.subsample_factor,
                     with_ft_offset=cfg.with_ft_offset,
                     column_scale=_column_scale,
+                    site_name=cfg.site_name,
                 )
             else:
                 cond = float(result.fun)
@@ -610,9 +625,23 @@ class ExcitationOptimizer:
                 best_x = result.x.copy()
                 best_idx = i
 
+            named_margins = self._compute_named_margins(result.x, constraints)
+            restart_summaries.append(
+                {
+                    "restart_index": i,
+                    "condition_number": cond,
+                    "feasible": feasible,
+                    "constraint_margin": margin,
+                    "named_margins": named_margins,
+                    "wall_time": restart_wall,
+                    "n_func_evals": result.nfev,
+                    "iter_logs": iter_logs,
+                }
+            )
+
             # Log restart summary to this restart's wandb run
             if wb_run is not None:
-                restart_margins = self._compute_named_margins(result.x, constraints)
+                restart_margins = named_margins
                 restart_summary: dict = {
                     "condition_number": cond,
                     "objective": obj_val,
@@ -658,6 +687,7 @@ class ExcitationOptimizer:
             cache=cache,
             constraints=constraints,
         )
+        opt_result.restart_history = restart_summaries
         if wb_enabled:
             self._log_wandb_summary(wandb_config, cfg, wb_group, opt_result)
         return opt_result
@@ -702,6 +732,7 @@ class ExcitationOptimizer:
                 )
                 futures[future] = i
 
+            restart_summaries: list[dict] = []
             stopped_early = False
             for future in as_completed(futures):
                 rr = future.result()
@@ -729,6 +760,19 @@ class ExcitationOptimizer:
                     best_cond = rr.condition_number
                     best_x = rr.x.copy()
                     best_idx = rr.restart_index
+
+                restart_summaries.append(
+                    {
+                        "restart_index": rr.restart_index,
+                        "condition_number": rr.condition_number,
+                        "feasible": rr.feasible,
+                        "constraint_margin": rr.constraint_margin,
+                        "named_margins": rr.named_margins,
+                        "wall_time": rr.wall_time,
+                        "n_func_evals": rr.n_func_evals,
+                        "iter_logs": rr.iter_logs,
+                    }
+                )
 
                 # Log this restart as an independent wandb run
                 if wb_enabled:
@@ -803,6 +847,7 @@ class ExcitationOptimizer:
             cache=cache,
             constraints=constraints,
         )
+        opt_result.restart_history = restart_summaries
         if wb_enabled:
             self._log_wandb_summary(wandb_config, cfg, wb_group, opt_result)
         return opt_result

@@ -15,6 +15,7 @@ def _compute_stacked_regressor(
     body_name: str,
     subsample_factor: int,
     with_ft_offset: bool = False,
+    site_name: str | None = None,
 ) -> np.ndarray:
     """Build stacked regressor from coefficient vector (shared by objectives)."""
     sample = cache.get(x)
@@ -27,6 +28,7 @@ def _compute_stacked_regressor(
         body_name,
         subsample_factor=subsample_factor,
         with_ft_offset=with_ft_offset,
+        site_name=site_name,
     )
 
 
@@ -48,6 +50,7 @@ def condition_number_objective(
     subsample_factor: int,
     with_ft_offset: bool = False,
     column_scale: bool = False,
+    site_name: str | None = None,
 ) -> float:
     """Compute condition number of the stacked body regressor.
 
@@ -56,7 +59,14 @@ def condition_number_objective(
     """
     try:
         stacked = _compute_stacked_regressor(
-            x, cache, model, data, body_name, subsample_factor, with_ft_offset
+            x,
+            cache,
+            model,
+            data,
+            body_name,
+            subsample_factor,
+            with_ft_offset,
+            site_name=site_name,
         )
         return compute_condition_number(stacked, column_scale=column_scale)
     except (np.linalg.LinAlgError, ValueError):
@@ -72,11 +82,19 @@ def d_optimal_objective(
     subsample_factor: int,
     with_ft_offset: bool = False,
     column_scale: bool = False,
+    site_name: str | None = None,
 ) -> float:
     """D-optimal objective: -log det(W^T W) = -2 * sum(log(sigma_i))."""
     try:
         stacked = _compute_stacked_regressor(
-            x, cache, model, data, body_name, subsample_factor, with_ft_offset
+            x,
+            cache,
+            model,
+            data,
+            body_name,
+            subsample_factor,
+            with_ft_offset,
+            site_name=site_name,
         )
         stacked = _maybe_column_scale(stacked, column_scale)
         sv = np.linalg.svd(stacked, compute_uv=False)
@@ -95,6 +113,7 @@ def d_optimal_with_cond(
     subsample_factor: int,
     with_ft_offset: bool = False,
     column_scale: bool = False,
+    site_name: str | None = None,
 ) -> tuple[float, float]:
     """Compute D-optimal objective and condition number from a single SVD.
 
@@ -103,7 +122,14 @@ def d_optimal_with_cond(
     """
     try:
         stacked = _compute_stacked_regressor(
-            x, cache, model, data, body_name, subsample_factor, with_ft_offset
+            x,
+            cache,
+            model,
+            data,
+            body_name,
+            subsample_factor,
+            with_ft_offset,
+            site_name=site_name,
         )
         stacked = _maybe_column_scale(stacked, column_scale)
         sv = np.linalg.svd(stacked, compute_uv=False)
@@ -131,6 +157,7 @@ def evaluate_full_resolution(
     q0: np.ndarray,
     with_ft_offset: bool = False,
     column_scale: bool = False,
+    site_name: str | None = None,
 ) -> tuple[float, np.ndarray]:
     """Evaluate objective at full resolution (no subsampling).
 
@@ -148,6 +175,7 @@ def evaluate_full_resolution(
         body_name,
         subsample_factor=1,
         with_ft_offset=with_ft_offset,
+        site_name=site_name,
     )
     cond = compute_condition_number(stacked, column_scale=column_scale)
     return cond, stacked
