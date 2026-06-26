@@ -61,7 +61,7 @@ def main() -> None:
     n_steps = len(trajectory.time)
     print(f"Trajectory: {n_steps} steps, {duration:.1f}s, {traj_fps:.0f} fps")
 
-    model, data = build_ur5e_model()
+    model, data = build_ur5e_model(payload_xml="scenes/objects/payload_flat.xml")
 
     tile_w = min(config.width, int(model.vis.global_.offwidth))
     tile_h = min(config.height, int(model.vis.global_.offheight))

@@ -122,7 +122,7 @@ def _build_config() -> OptimizeExcitationConfig:
 def main() -> None:
     config = _build_config()
 
-    model, data = build_ur5e_model()
+    model, data = build_ur5e_model(payload_xml="scenes/objects/payload_flat.xml")
     q0 = np.array(data.qpos[:6], dtype=np.float64)
 
     workspace_config: WorkspaceConstraintConfig | None = None
@@ -184,6 +184,8 @@ def main() -> None:
         workspace_config=workspace_config,
         collision_config=collision_config,
         payload_workspace_config=payload_workspace_config,
+        body_name="payload_payload_box_mount",
+        site_name="ft300s_ft_sensor",
         ee_velocity_config=ee_velocity_config,
         enable_velocity_constraint=enable_vel_constraint,
         enable_acceleration_constraint=has_acc,

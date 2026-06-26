@@ -1,7 +1,8 @@
 """Grid search over excitation trajectory optimization parameters.
 
-Sweeps workspace size, EE velocity, joint velocity, and joint acceleration
-limits with FT offset (16-column regressor) enabled.
+Sweeps EE velocity, joint velocity, and joint acceleration limits with
+FT offset (16-column regressor) enabled. Workspace is read from the model's
+workspace_region_geom (fixed across all conditions).
 
 Parallelizes at the condition level: each condition runs 8 sequential restarts,
 up to 14 conditions run simultaneously (one per physical core minus OS headroom).
@@ -17,9 +18,11 @@ from dataclasses import dataclass
 from math import pi
 from pathlib import Path
 
+import mujoco
 import numpy as np
 
-from ur5e_sim.core.env import load_model, reset_to_home
+from ur5e_sim.core.env import get_named_object_id
+from ur5e_sim.core.model_builder import build_ur5e_model
 from ur5e_sim.identification.collision import CollisionConfig
 from ur5e_sim.identification.constraints import JointLimits
 from ur5e_sim.identification.io import (
@@ -36,14 +39,9 @@ from ur5e_sim.identification.optimizer import (
 from ur5e_sim.identification.workspace import EeVelocityConfig, WorkspaceConstraintConfig
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_SCENE = str(_REPO_ROOT / "scenes" / "tasks" / "identification.xml")
 _RESULTS_DIR = _REPO_ROOT / "results" / "grid_search"
 
-HOME_CENTER_Y = 0.55
-Z_MIN = 0.05
-Z_MAX = 0.50
-
-MAX_CONDITION_WORKERS = 14
+MAX_CONDITION_WORKERS = 24
 
 
 @dataclass(frozen=True)
@@ -94,7 +92,17 @@ def build_conditions() -> list[Condition]:
     ]
 
 
-def _run_condition_worker(label: str, cond_dict: dict, output_dir: str, model_path: str) -> dict:
+def _get_workspace_center(model: mujoco.MjModel, data: mujoco.MjData) -> np.ndarray:
+    """Read workspace center from workspace_region_geom in the model."""
+    geom_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_GEOM, "workspace_region_geom")
+    if geom_id is None:
+        raise RuntimeError("workspace_region_geom not found in model")
+    body_id = model.geom_bodyid[geom_id]
+    mujoco.mj_kinematics(model, data)
+    return data.xpos[body_id].copy()
+
+
+def _run_condition_worker(label: str, cond_dict: dict, output_dir: str) -> dict:
     """Top-level function for ProcessPoolExecutor (must be picklable)."""
     cond = Condition(**cond_dict)
     out = Path(output_dir)
@@ -102,12 +110,12 @@ def _run_condition_worker(label: str, cond_dict: dict, output_dir: str, model_pa
     result_path = out / "result.json"
     traj_path = out / "traj.json"
 
-    loaded = load_model(model_path)
-    reset_to_home(loaded.model, loaded.data)
-    q0 = np.array(loaded.data.qpos[:6], dtype=np.float64)
-
-    box_lower = np.array([-cond.ws_x_half, HOME_CENTER_Y - cond.ws_y_half, Z_MIN])
-    box_upper = np.array([cond.ws_x_half, HOME_CENTER_Y + cond.ws_y_half, Z_MAX])
+    model, data = build_ur5e_model(payload_xml="scenes/objects/payload_flat.xml")
+    q0 = np.array(data.qpos[:6], dtype=np.float64)
+    ws_center = _get_workspace_center(model, data)
+    z_half = 0.275  # fixed z half-width from workspace_region_geom
+    box_lower = ws_center - np.array([cond.ws_x_half, cond.ws_y_half, z_half])
+    box_upper = ws_center + np.array([cond.ws_x_half, cond.ws_y_half, z_half])
 
     opt_config = OptimizerConfig(
         num_joints=6,
@@ -129,6 +137,8 @@ def _run_condition_worker(label: str, cond_dict: dict, output_dir: str, model_pa
         payload_workspace_config=WorkspaceConstraintConfig(
             box_lower=box_lower, box_upper=box_upper
         ),
+        body_name="payload_payload_box_mount",
+        site_name="ft300s_ft_sensor",
         ee_velocity_config=EeVelocityConfig(max_linear_velocity=cond.ee_vel),
         enable_velocity_constraint=False,
         enable_acceleration_constraint=True,
@@ -138,7 +148,7 @@ def _run_condition_worker(label: str, cond_dict: dict, output_dir: str, model_pa
         n_workers=1,
     )
 
-    optimizer = ExcitationOptimizer(config=opt_config, model=loaded.model, data=loaded.data)
+    optimizer = ExcitationOptimizer(config=opt_config, model=model, data=data)
     result = optimizer.optimize(
         wandb_config=WandbConfig(enabled=False),
         early_stop_config=EarlyStopConfig(enabled=False),
@@ -186,7 +196,7 @@ def main() -> None:
                 "dq": cond.dq,
                 "ddq": cond.ddq,
             }
-            fut = pool.submit(_run_condition_worker, cond.label, cond_dict, str(out_dir), _SCENE)
+            fut = pool.submit(_run_condition_worker, cond.label, cond_dict, str(out_dir))
             futures_map[fut] = cond.label
 
         done_count = 0
