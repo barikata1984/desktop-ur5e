@@ -15,9 +15,9 @@ import numpy as np
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
-_ARM_HOME_QPOS = [-1.5708, -1.5708, 1.5708, -1.5708, -1.5708, 0.0]
+_ARM_HOME_QPOS = [1.324683, -1.468515, 1.368294, -1.470575, -1.570796, -0.246113]
 _GRIPPER_HOME_QPOS = [0.0] * 8  # 8 gripper joints (drivers, couplers, spring links, followers)
-_ARM_HOME_CTRL = [-1.5708, -1.5708, 1.5708, -1.5708, -1.5708, 0.0]
+_ARM_HOME_CTRL = [1.324683, -1.468515, 1.368294, -1.470575, -1.570796, -0.246113]
 _GRIPPER_HOME_CTRL = [0.0]  # single actuator
 
 
@@ -76,10 +76,10 @@ def _build_spec(
     spec.attach(gripper, prefix="gripper_", site=spec.site("ft300s_tool_output"))
     spec.body("gripper_base_mount").pos = [0.0, 0.0, 0.004]
 
-    # --- 5. Optional payload on ft300s_ft_sensor ---
+    # --- 5. Optional payload at gripper pinch site ---
     if payload_xml is not None:
         payload = mujoco.MjSpec.from_file(str(_PROJECT_ROOT / payload_xml))
-        spec.attach(payload, prefix="payload_", site=spec.site("ft300s_ft_sensor"))
+        spec.attach(payload, prefix="payload_", site=spec.site("gripper_pinch"))
 
     # --- 6. Attach environment (floor, table, lighting) ---
     env_site = spec.worldbody.add_site()
@@ -94,7 +94,20 @@ def _build_spec(
     base.pos = [0.0, 0.1, 0.3]
     base.quat = [1.0, 0.0, 0.0, 0.0]
 
-    # --- 8. Update home keyframe for the extended qpos/ctrl ---
+    # --- 8. Workspace region (visual-only, read by optimizer at runtime) ---
+    ws_body = spec.worldbody.add_body()
+    ws_body.name = "workspace_region"
+    ws_body.pos = [0.0, 0.65, 0.636]
+    ws_geom = ws_body.add_geom()
+    ws_geom.name = "workspace_region_geom"
+    ws_geom.type = mujoco.mjtGeom.mjGEOM_BOX
+    ws_geom.size = [0.25, 0.35, 0.275]
+    ws_geom.contype = 0
+    ws_geom.conaffinity = 0
+    ws_geom.group = 4
+    ws_geom.rgba = [0.2, 0.7, 0.9, 0.18]
+
+    # --- 9. Update home keyframe for the extended qpos/ctrl ---
     _update_home_keyframe(spec)
 
     return spec
