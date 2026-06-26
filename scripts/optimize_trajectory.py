@@ -13,7 +13,7 @@ import numpy as np
 import tyro
 import yaml
 
-from ur5e_sim.core.env import get_named_object_id
+from ur5e_sim.core.env import get_workspace_bounds
 from ur5e_sim.core.model_builder import build_ur5e_model
 from ur5e_sim.identification.collision import CollisionConfig
 from ur5e_sim.identification.io import (
@@ -135,18 +135,14 @@ def main() -> None:
 
     payload_workspace_config: WorkspaceConstraintConfig | None = None
     if config.enable_payload_workspace:
-        geom_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_GEOM, "workspace_region_geom")
-        if geom_id is not None:
-            body_id = model.geom_bodyid[geom_id]
-            mujoco.mj_kinematics(model, data)
-            center = data.xpos[body_id].copy()
-            half = model.geom_size[geom_id].copy()
-            box_lower = center - half
-            box_upper = center + half
+        try:
+            box_lower, box_upper = get_workspace_bounds(model, data)
             print(f"  payload workspace bounds: {box_lower} .. {box_upper}")
             payload_workspace_config = WorkspaceConstraintConfig(
                 box_lower=box_lower, box_upper=box_upper
             )
+        except RuntimeError:
+            pass
 
     ee_velocity_config: EeVelocityConfig | None = None
     if config.ee_max_linear_velocity > 0:

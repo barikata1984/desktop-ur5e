@@ -27,6 +27,23 @@ def get_named_object_id(model: mujoco.MjModel, object_type: mujoco.mjtObj, name:
     return int(object_id)
 
 
+import numpy as np
+
+
+def get_workspace_bounds(
+    model: mujoco.MjModel, data: mujoco.MjData
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return (box_lower, box_upper) from workspace_region_geom."""
+    geom_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_GEOM, "workspace_region_geom")
+    if geom_id is None:
+        raise RuntimeError("workspace_region_geom not found in model")
+    body_id = model.geom_bodyid[geom_id]
+    mujoco.mj_kinematics(model, data)
+    center = data.xpos[body_id].copy()
+    half = model.geom_size[geom_id].copy()
+    return center - half, center + half
+
+
 def reset_to_home(model: mujoco.MjModel, data: mujoco.MjData) -> bool:
     key_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_KEY, "home")
     if key_id is None:

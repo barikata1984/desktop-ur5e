@@ -18,10 +18,9 @@ from dataclasses import dataclass
 from math import pi
 from pathlib import Path
 
-import mujoco
 import numpy as np
 
-from ur5e_sim.core.env import get_named_object_id
+from ur5e_sim.core.env import get_workspace_bounds
 from ur5e_sim.core.model_builder import build_ur5e_model
 from ur5e_sim.identification.collision import CollisionConfig
 from ur5e_sim.identification.constraints import JointLimits
@@ -92,16 +91,6 @@ def build_conditions() -> list[Condition]:
     ]
 
 
-def _get_workspace_center(model: mujoco.MjModel, data: mujoco.MjData) -> np.ndarray:
-    """Read workspace center from workspace_region_geom in the model."""
-    geom_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_GEOM, "workspace_region_geom")
-    if geom_id is None:
-        raise RuntimeError("workspace_region_geom not found in model")
-    body_id = model.geom_bodyid[geom_id]
-    mujoco.mj_kinematics(model, data)
-    return data.xpos[body_id].copy()
-
-
 def _run_condition_worker(label: str, cond_dict: dict, output_dir: str) -> dict:
     """Top-level function for ProcessPoolExecutor (must be picklable)."""
     cond = Condition(**cond_dict)
@@ -112,8 +101,9 @@ def _run_condition_worker(label: str, cond_dict: dict, output_dir: str) -> dict:
 
     model, data = build_ur5e_model(payload_xml="scenes/objects/payload_flat.xml")
     q0 = np.array(data.qpos[:6], dtype=np.float64)
-    ws_center = _get_workspace_center(model, data)
-    z_half = 0.275  # fixed z half-width from workspace_region_geom
+    ws_lower, ws_upper = get_workspace_bounds(model, data)
+    ws_center = (ws_lower + ws_upper) / 2
+    z_half = (ws_upper[2] - ws_lower[2]) / 2
     box_lower = ws_center - np.array([cond.ws_x_half, cond.ws_y_half, z_half])
     box_upper = ws_center + np.array([cond.ws_x_half, cond.ws_y_half, z_half])
 
