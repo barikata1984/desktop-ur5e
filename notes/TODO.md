@@ -10,9 +10,11 @@
 - [x] devcontainer postCreateCommand の `python --version` 失敗を修正
 - [x] インタラクティブ軌道設計ツール (IK ベースコーンスイープ) の実装
 - [ ] ロボット XML をペイロードのオプション化でリファクタリング (ur5e_ft300s_gripper_no_payload.xml の重複解消)
-- [ ] グリッドサーチ再実行: ロボット構成オフセット調整後 (attachment_site=0.094, gripper_base_mount=0.004) に全 24 条件が実行可能かを確認
+- [x] グリッドサーチ再実行: ロボット構成オフセット調整後 (attachment_site=0.094, gripper_base_mount=0.004) に全 24 条件が実行可能かを確認 (全条件実行完了, ただし全条件 infeasible — ISSUES 参照)
 - [ ] attachment_site 94mm vs DH パラメータ L_TP=100mm のギャップを物理的に確認し, 正しいオフセット値を決定
 - [ ] push migration plan の実施: notes/PLAN_push_model_builder_migration.md に従い pushing/ と identification/ を build_ur5e_model() に移行
+- [ ] 励起軌道最適化の制約を緩める: EE 速度上限・ペイロードワークスペース上限を段階的に緩和し, 実行可能な軌道を生成する
+- [ ] FIM 相関行列の改善: バイアス-重力の相関 (b_tz↔m ≈ 0.98) を低減するため, 矢状面外へのポーズ変動を増やす方策を検討する
 - [x] グリッパ XML の命名規則統一 (push 版と FT300s 版で `gripper_` プレフィックスを除去して揃える)
 - [x] MPC プッシュループにリアルタイム進捗表示 (`[XX.X%]`) を追加
 - [x] regressor.py / workspace.py / collision.py を nq=14 モデル (6 関節軌道) に対応 (zero-padding)
