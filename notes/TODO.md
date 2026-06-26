@@ -15,6 +15,8 @@
 - [ ] push migration plan の実施: notes/PLAN_push_model_builder_migration.md に従い pushing/ と identification/ を build_ur5e_model() に移行
 - [ ] 励起軌道最適化の制約を緩める: EE 速度上限・ペイロードワークスペース上限を段階的に緩和し, 実行可能な軌道を生成する
 - [ ] FIM 相関行列の改善: バイアス-重力の相関 (b_tz↔m ≈ 0.98) を低減するため, 矢状面外へのポーズ変動を増やす方策を検討する
+- [ ] D-optimality (det(FIM) 最大化) を目的関数として試験し, 条件数最小化との相関低減効果を比較する
+- [ ] ホームポーズを実験用水平姿勢から元に戻すか設定可能にし, push パイプライン作業前に確定する (現状は水平姿勢 [1.031643, -1.461450, 2.562062, -4.242204, -1.031607, 0.000245] に変更済み)
 - [x] グリッパ XML の命名規則統一 (push 版と FT300s 版で `gripper_` プレフィックスを除去して揃える)
 - [x] MPC プッシュループにリアルタイム進捗表示 (`[XX.X%]`) を追加
 - [x] regressor.py / workspace.py / collision.py を nq=14 モデル (6 関節軌道) に対応 (zero-padding)
