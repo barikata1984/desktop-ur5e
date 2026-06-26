@@ -15,9 +15,9 @@ import numpy as np
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
-_ARM_HOME_QPOS = [1.324683, -1.468515, 1.368294, -1.470575, -1.570796, -0.246113]
+_ARM_HOME_QPOS = [1.031643, -1.461450, 2.562062, -4.242204, -1.031607, 0.000245]
 _GRIPPER_HOME_QPOS = [0.0] * 8  # 8 gripper joints (drivers, couplers, spring links, followers)
-_ARM_HOME_CTRL = [1.324683, -1.468515, 1.368294, -1.470575, -1.570796, -0.246113]
+_ARM_HOME_CTRL = [1.031643, -1.461450, 2.562062, -4.242204, -1.031607, 0.000245]
 _GRIPPER_HOME_CTRL = [0.0]  # single actuator
 
 

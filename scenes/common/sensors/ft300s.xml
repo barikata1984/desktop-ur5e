@@ -33,7 +33,7 @@
         contype="0" conaffinity="0" group="2"/>
       <geom type="cylinder" size="0.0375 0.0211" pos="0 0 0.0211" group="3"/>
       <body name="gripper_mount" pos="0 0 0.0422">
-        <site name="ft_sensor" pos="0 0 0" size="0.01"/>
+        <site name="ft_sensor" pos="0 0 -0.0065" size="0.01"/>
         <site name="tool_output" pos="0 0 0" size="0.001"/>
       </body>
     </body>
