@@ -44,13 +44,11 @@ def _render_single_view(
     renderer: mujoco.Renderer,
     model: mujoco.MjModel,
     data: mujoco.MjData,
-    camera: str | mujoco.MjvCamera | None,
+    camera: mujoco.MjvCamera | str | None,
     show_ee_frame: bool,
     axis_length: float,
 ) -> np.ndarray:
-    if isinstance(camera, mujoco.MjvCamera):
-        renderer.update_scene(data, camera=camera)
-    elif camera:
+    if camera is not None:
         renderer.update_scene(data, camera=camera)
     else:
         renderer.update_scene(data)
