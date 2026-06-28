@@ -28,20 +28,29 @@ class RenderPlaybackConfig:
     axis_length: float = 0.15
     playback_speed: float = 1.0
     multi_camera: bool = False
-    grid_cameras: tuple[str, ...] = ("", "view_x", "view_y", "view_z")
     save_frames: bool = False
     frames_dir: str = "results/frames"
+
+
+GRID_CAMERAS = [
+    ("overview", 130, -22, 1.90, (0.0, 0.60, 0.50)),
+    ("top", 90, -90, 1.55, (0.0, 0.62, 0.50)),
+    ("front", 270, -7, 1.50, (0.0, 0.62, 0.55)),
+    ("side", 0, -7, 1.62, (0.0, 0.55, 0.55)),
+]
 
 
 def _render_single_view(
     renderer: mujoco.Renderer,
     model: mujoco.MjModel,
     data: mujoco.MjData,
-    camera: str | None,
+    camera: str | mujoco.MjvCamera | None,
     show_ee_frame: bool,
     axis_length: float,
 ) -> np.ndarray:
-    if camera:
+    if isinstance(camera, mujoco.MjvCamera):
+        renderer.update_scene(data, camera=camera)
+    elif camera:
         renderer.update_scene(data, camera=camera)
     else:
         renderer.update_scene(data)
@@ -68,10 +77,12 @@ def main() -> None:
     renderer = mujoco.Renderer(model, height=tile_h, width=tile_w)
 
     if config.multi_camera:
-        cameras: list[str | None] = [(c if c else None) for c in config.grid_cameras]
-        while len(cameras) < 4:
-            cameras.append(None)
-        cameras = cameras[:4]
+        cameras: list[mujoco.MjvCamera] = []
+        for _, az, el, dist, la in GRID_CAMERAS:
+            cam = mujoco.MjvCamera()
+            cam.lookat[:] = la
+            cam.distance, cam.azimuth, cam.elevation = dist, az, el
+            cameras.append(cam)
 
     video_fps = config.fps_video
     speed = config.playback_speed
@@ -91,11 +102,10 @@ def main() -> None:
     if config.save_frames:
         base_dir = Path(config.frames_dir)
         if config.multi_camera:
-            for cam in cameras:
-                label = cam or "default"
-                cam_dir = base_dir / label
+            for name, *_ in GRID_CAMERAS:
+                cam_dir = base_dir / name
                 cam_dir.mkdir(parents=True, exist_ok=True)
-                frame_dirs[label] = cam_dir
+                frame_dirs[name] = cam_dir
         else:
             label = config.camera or "default"
             cam_dir = base_dir / label
@@ -109,14 +119,14 @@ def main() -> None:
 
         if config.multi_camera:
             tiles = []
-            for cam in cameras:
+            for cam_idx, cam in enumerate(cameras):
                 tile = _render_single_view(
                     renderer, model, data, cam, config.show_ee_frame, config.axis_length
                 )
                 tiles.append(tile)
                 if config.save_frames:
-                    label = cam or "default"
-                    iio.imwrite(str(frame_dirs[label] / f"{frame_idx:04d}.png"), tile)
+                    name = GRID_CAMERAS[cam_idx][0]
+                    iio.imwrite(str(frame_dirs[name] / f"{frame_idx:04d}.png"), tile)
             top = np.concatenate([tiles[0], tiles[1]], axis=1)
             bottom = np.concatenate([tiles[2], tiles[3]], axis=1)
             grid = np.concatenate([top, bottom], axis=0)
