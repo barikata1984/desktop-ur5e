@@ -85,12 +85,6 @@ def test_large_amplitude_violates_joint_constraint() -> None:
 
 # --- Workspace constraint tests ---
 # These tests use _TrajectoryCache which produces 6-joint trajectories, but the
-# identification scene has 14 joints. The workspace/collision functions do
-# data.qpos[:] = q[i] which fails on dimension mismatch.
-# Marked xfail until the identification code supports nq > num_joints.
-
-
-@pytest.mark.xfail(reason="identification scene has nq=14, cache produces 6-joint trajectories")
 def test_workspace_displacement_with_known_trajectory() -> None:
     loaded = _load_scene()
     cache = _make_cache()
@@ -103,7 +97,6 @@ def test_workspace_displacement_with_known_trajectory() -> None:
     assert np.all(distances >= 0)
 
 
-@pytest.mark.xfail(reason="identification scene has nq=14, cache produces 6-joint trajectories")
 def test_workspace_constraint_small_motion() -> None:
     loaded = _load_scene()
     cache = _make_cache()
@@ -125,7 +118,6 @@ def test_collision_checker_home_config_is_safe() -> None:
     assert clearance > 0, f"Home configuration should be collision-free, got {clearance:.4f}"
 
 
-@pytest.mark.xfail(reason="identification scene has nq=14, cache produces 6-joint trajectories")
 def test_collision_checker_trajectory() -> None:
     loaded = _load_scene()
     checker = CollisionChecker(loaded.model, loaded.data)

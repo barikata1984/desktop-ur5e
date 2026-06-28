@@ -26,7 +26,6 @@ def _short_config() -> MPCConfig:
     )
 
 
-@pytest.mark.xfail(reason="identification scene has nq=14, MPC internally uses 6-joint arrays")
 def test_mpc_loop_runs():
     loaded = _load_and_reset()
     mpc = MPCLoop(_short_config(), loaded.model, loaded.data)
@@ -39,7 +38,6 @@ def test_mpc_loop_runs():
     assert result.total_samples > 0
 
 
-@pytest.mark.xfail(reason="identification scene has nq=14, MPC internally uses 6-joint arrays")
 def test_state_continuity():
     loaded = _load_and_reset()
     mpc = MPCLoop(_short_config(), loaded.model, loaded.data)

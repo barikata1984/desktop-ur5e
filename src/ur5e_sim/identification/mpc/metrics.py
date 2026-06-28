@@ -26,7 +26,8 @@ def _gravity_directions_body(
 
     directions = []
     for i in range(0, len(q_trajectory), subsample):
-        data.qpos[:] = q_trajectory[i]
+        nq_traj = q_trajectory.shape[1]
+        data.qpos[:nq_traj] = q_trajectory[i]
         mujoco.mj_kinematics(model, data)
         rotation = data.xmat[body_id].reshape(3, 3)
         g_body = rotation.T @ _GRAVITY_WORLD

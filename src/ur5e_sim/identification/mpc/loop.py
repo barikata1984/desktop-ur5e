@@ -157,9 +157,10 @@ class MPCLoop:
                 self._rtls.update(W_new, y_new)
             estimation = self._rtls.get_current_estimate()
 
-            q_start = q_meas[0].copy()
-            q_current = q_meas[-1].copy()
-            dq_current = dq_meas[-1].copy()
+            nj = cfg.num_joints
+            q_start = q_meas[0, :nj].copy()
+            q_current = q_meas[-1, :nj].copy()
+            dq_current = dq_meas[-1, :nj].copy()
 
             print(
                 f"  -> cond={cond_accumulated:.2f}  "

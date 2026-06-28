@@ -132,7 +132,6 @@ def test_d_optimal_returns_large_value_for_zero_coefficients() -> None:
     assert val > 100
 
 
-@pytest.mark.xfail(reason="identification scene has nq=14, cache produces 6-joint trajectories")
 def test_d_optimal_decreases_with_better_trajectory() -> None:
     """A trajectory with better excitation should have a lower (more negative) D-optimal value."""
     loaded = _load_scene()
@@ -351,7 +350,6 @@ def test_result_to_trajectory_reconstructs_valid_trajectory() -> None:
 # --- validate_trajectory tests ---
 
 
-@pytest.mark.xfail(reason="identification scene has nq=14, cache produces 6-joint trajectories")
 def test_validate_trajectory_returns_expected_keys() -> None:
     loaded = _load_scene()
     cfg = OptimizerConfig(
