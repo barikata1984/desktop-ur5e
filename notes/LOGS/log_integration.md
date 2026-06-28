@@ -139,3 +139,39 @@ pixi が `[pypi-dependencies]` の editable install を管理しており, pixi 
 ### results/ を .gitignore に追加
 
 シミュレーション出力ディレクトリ `results/` が未追跡かつ未 ignore の状態だったため `.gitignore` に追加した.
+
+---
+
+## 2026-06-28 — pushing/ スクリプト群の build_ur5e_model() 移行完了
+
+`notes/PLAN_push_model_builder_migration.md` に定義した Task A/B/C をすべて完了した.
+
+### 変更内容
+
+**Task A — model_builder.py の ft300s_xml=None 対応**
+
+`build_ur5e_model()` に `ft300s_xml: str | None = None` パラメータを追加した.
+`None` の場合は FT300s をアタッチせず, FT300s なし構成 (push タスク用) のモデルを返す.
+
+**Task B — pushing/scene.py の新設と build_push_model() 実装**
+
+`src/ur5e_sim/pushing/scene.py` を新設し, `build_push_model()` を実装した.
+`build_ur5e_model(ft300s_xml=None)` を呼び出してグリッパのみ構成のモデルをビルドする.
+
+**Task C — task.py / keyframe.py / grid_video.py の移行**
+
+`pushing/task.py`, `pushing/keyframe.py`, `pushing/viz/grid_video.py` を `build_push_model()` に移行した.
+monolithic XML ロードを廃止し, モデルビルダー経由に統一した.
+
+全 94 テストがパスしたことを確認した. push 実行でゴール到達を確認した.
+
+### 付随する変更
+
+**グリッドビデオ自動出力**
+
+push タスクは毎回 4 視点グリッド動画 `result_grid.mp4` を出力するようになった (旧: 単視点 `push_sim.mp4`).
+
+**オフスクリーンレンダリング解像度の明示設定**
+
+`model_builder.py` と `pushing/scene.py` に `offwidth` / `offheight` を明示設定した.
+`environment.xml` のビジュアル設定が `MjSpec.attach()` 経由では継承されないため, Python 側で上書きが必要なことが判明した.
