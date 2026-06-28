@@ -171,8 +171,8 @@ def test_optimizer_config_defaults() -> None:
     assert cfg.ftol == 1e-6
     assert cfg.seed == 42
     assert cfg.joint_limits is not None
-    assert cfg.body_name == "payload_box_mount"
-    assert cfg.site_name == "attachment_site"
+    assert cfg.body_name == "payload_payload_box_mount"
+    assert cfg.site_name == "ft300s_ft_sensor"
 
 
 # --- _generate_random_x0 tests ---
