@@ -17,7 +17,13 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
-from ur5e_sim.core.ik import ORI_GAIN, damped_pinv, get_jacobian6, orientation_error
+from ur5e_sim.core.ik import (
+    GRIPPER_CLOSED_CTRL,
+    ORI_GAIN,
+    damped_pinv,
+    get_jacobian6,
+    orientation_error,
+)
 from ur5e_sim.core.renderer import FrameRenderer
 from ur5e_sim.pushing.viz.grid_video import render_grid_video
 from ur5e_sim.core.sensors import ContactSensor
@@ -63,7 +69,7 @@ def move_tip_to(
         dq = damped_pinv(J, cfg.robot.damping) @ np.concatenate([pstep, ostep])
         ctrl = ctrl + dq
         d.ctrl[:6] = ctrl
-        d.ctrl[6] = 255  # keep gripper closed
+        d.ctrl[6] = GRIPPER_CLOSED_CTRL  # keep gripper closed
         for __ in range(substeps):
             mujoco.mj_step(m, d)
         if renderer is not None:
@@ -105,7 +111,7 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
     print(f"Initial slider pos: {slider_pos_init}, theta: {np.degrees(slider_theta_init):.2f} deg")
 
     ctrl = d.ctrl[:6].copy()
-    d.ctrl[6] = 255
+    d.ctrl[6] = GRIPPER_CLOSED_CTRL
     substeps = int(cfg.mpc.dt / m.opt.timestep)
 
     renderer = FrameRenderer(m, pics_dir, cfg.render.width, cfg.render.height, cfg.render.camera)
@@ -232,7 +238,7 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
         dq = damped_pinv(J, cfg.robot.damping) @ (v6 * cfg.mpc.dt)
         ctrl = ctrl + dq
         d.ctrl[:6] = ctrl
-        d.ctrl[6] = 255  # keep gripper closed
+        d.ctrl[6] = GRIPPER_CLOSED_CTRL  # keep gripper closed
 
         for _ in range(substeps):
             mujoco.mj_step(m, d)

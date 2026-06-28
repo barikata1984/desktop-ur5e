@@ -10,7 +10,7 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 
-from ur5e_sim.core.ik import damped_pinv, get_jacobian6, orientation_error
+from ur5e_sim.core.ik import GRIPPER_CLOSED_CTRL, solve_ik
 from ur5e_sim.pushing.keyframe import close_gripper_sim
 from ur5e_sim.pushing.kinematics import R_TOOL0_DES
 
@@ -23,48 +23,6 @@ AXIS_COLORS = [
     [0, 1, 0, 1],
     [0, 0, 1, 1],
 ]
-
-
-def solve_ik_quiet(
-    m: mujoco.MjModel,
-    d: mujoco.MjData,
-    tip_id: int,
-    ori_id: int,
-    target_pos: np.ndarray,
-    R_ori_des: np.ndarray,
-    q_init: np.ndarray,
-    gripper_qpos: np.ndarray,
-) -> tuple[np.ndarray, float]:
-    d.qpos[:6] = q_init
-    d.qpos[6:14] = gripper_qpos
-    d.ctrl[:6] = q_init
-    d.ctrl[6] = 255.0
-    mujoco.mj_forward(m, d)
-
-    for _ in range(2000):
-        tip = d.site_xpos[tip_id].copy()
-        perr = target_pos - tip
-        oerr = orientation_error(d, ori_id, R_ori_des)
-        if np.linalg.norm(perr) < 5e-4 and np.linalg.norm(oerr) < 1e-3:
-            break
-
-        pstep = perr.copy()
-        pn = np.linalg.norm(pstep)
-        if pn > 0.05:
-            pstep *= 0.05 / pn
-        ostep = np.clip(oerr, -0.1, 0.1)
-
-        J = get_jacobian6(m, d, tip_id, ori_id)
-        dq = damped_pinv(J, 1e-3) @ np.concatenate([pstep, ostep])
-        d.qpos[:6] += dq
-        d.qpos[6:14] = gripper_qpos
-        d.ctrl[:6] = d.qpos[:6]
-        d.ctrl[6] = 255.0
-        mujoco.mj_forward(m, d)
-
-    tip_final = d.site_xpos[tip_id].copy()
-    err = np.linalg.norm(target_pos - tip_final)
-    return d.qpos[:6].copy(), err
 
 
 def Ry(theta: float) -> np.ndarray:
@@ -109,7 +67,7 @@ def main() -> None:
     # Step 1: solve flange-down IK → get site transforms
     print("Solving flange-down reference IK...")
     mujoco.mj_resetData(m, d)
-    q_ref, _ = solve_ik_quiet(m, d, tip_id, ori_id, target_pos, R_TOOL0_DES, q_init, gripper_qpos)
+    q_ref, _, _ = solve_ik(m, d, tip_id, ori_id, target_pos, R_TOOL0_DES, q_init, gripper_qpos)
 
     R_world_att_ref = d.site_xmat[ori_id].reshape(3, 3).copy()
     R_world_pinch_ref = d.site_xmat[tip_id].reshape(3, 3).copy()
@@ -121,7 +79,7 @@ def main() -> None:
     R_att_tilted = R_pinch_tilted @ R_att_pinch.T
 
     mujoco.mj_resetData(m, d)
-    q_start, err = solve_ik_quiet(
+    q_start, err, _ = solve_ik(
         m,
         d,
         tip_id,
@@ -145,7 +103,7 @@ def main() -> None:
     for idx, angle in enumerate(angles):
         R_att_new = Rz_world(angle) @ R_world_att_start
         mujoco.mj_resetData(m, d)
-        q, err = solve_ik_quiet(m, d, tip_id, ori_id, target_pos, R_att_new, q_prev, gripper_qpos)
+        q, err, _ = solve_ik(m, d, tip_id, ori_id, target_pos, R_att_new, q_prev, gripper_qpos)
         q_trajectory[idx] = q
         q_prev = q
         if idx % 12 == 0:
@@ -198,7 +156,7 @@ def main() -> None:
     d.qpos[:6] = q_trajectory[0]
     d.qpos[6:14] = gripper_qpos
     d.ctrl[:6] = q_trajectory[0]
-    d.ctrl[6] = 255.0
+    d.ctrl[6] = GRIPPER_CLOSED_CTRL
     mujoco.mj_forward(m, d)
 
     viewer_fps = 30
@@ -210,7 +168,7 @@ def main() -> None:
             d.qpos[:6] = q_trajectory[idx]
             d.qpos[6:14] = gripper_qpos
             d.ctrl[:6] = q_trajectory[idx]
-            d.ctrl[6] = 255.0
+            d.ctrl[6] = GRIPPER_CLOSED_CTRL
             mujoco.mj_forward(m, d)
 
             tip_pos = d.site_xpos[tip_id].copy()

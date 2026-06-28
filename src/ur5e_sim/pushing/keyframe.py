@@ -26,7 +26,7 @@ from __future__ import annotations
 import mujoco
 import numpy as np
 
-from ur5e_sim.core.ik import damped_pinv, get_jacobian6, orientation_error
+from ur5e_sim.core.ik import GRIPPER_CLOSED_CTRL, orientation_error, solve_ik
 from ur5e_sim.pushing.kinematics import R_TOOL0_DES
 from ur5e_sim.pushing.scene import build_push_model
 
@@ -40,68 +40,13 @@ def close_gripper_sim(
     mujoco.mj_resetData(m, d)
     d.qpos[:6] = np.array([-1.5708, -1.5708, 1.5708, -1.5708, -1.5708, 0.0])
     d.ctrl[:6] = d.qpos[:6].copy()
-    d.ctrl[6] = 255.0
+    d.ctrl[6] = GRIPPER_CLOSED_CTRL
     substeps = int(settle_time / m.opt.timestep)
     for _ in range(substeps):
         mujoco.mj_step(m, d)
     gripper_qpos = d.qpos[6:14].copy()
     print(f"Gripper closed joint values: {np.round(gripper_qpos, 6)}")
     return gripper_qpos
-
-
-def solve_ik(
-    m: mujoco.MjModel,
-    d: mujoco.MjData,
-    tip_site_id: int,
-    ori_site_id: int,
-    target_pos: np.ndarray,
-    q_init: np.ndarray,
-    gripper_qpos: np.ndarray,
-    max_iter: int = 2000,
-    pos_tol: float = 5e-4,
-    ori_tol: float = 1e-3,
-    gain: float = 1.0,
-    max_step: float = 0.05,
-    damping: float = 1e-3,
-) -> tuple[np.ndarray, float, float]:
-    """6-DOF IK: drive pinch to target_pos and tool0 to R_TOOL0_DES.
-
-    Returns (arm_qpos, pos_err_m, ori_err_rad).
-    """
-    d.qpos[:6] = q_init.copy()
-    d.qpos[6:14] = gripper_qpos.copy()
-    d.ctrl[:6] = q_init.copy()
-    d.ctrl[6] = 255.0
-    mujoco.mj_forward(m, d)
-
-    for i in range(max_iter):
-        tip = d.site_xpos[tip_site_id].copy()
-        perr = target_pos - tip
-        oerr = orientation_error(d, ori_site_id, R_TOOL0_DES)
-        pdist = np.linalg.norm(perr)
-        odist = np.linalg.norm(oerr)
-        if pdist < pos_tol and odist < ori_tol:
-            print(f"  IK converged at iter {i}, pos_err={pdist:.6f}m ori_err={odist:.6f}")
-            break
-
-        pstep = perr * gain
-        pn = np.linalg.norm(pstep)
-        if pn > max_step:
-            pstep *= max_step / pn
-        ostep = np.clip(oerr * gain, -0.1, 0.1)
-
-        J = get_jacobian6(m, d, tip_site_id, ori_site_id)
-        dq = damped_pinv(J, damping) @ np.concatenate([pstep, ostep])
-        d.qpos[:6] += dq
-        d.qpos[6:14] = gripper_qpos.copy()
-        d.ctrl[:6] = d.qpos[:6].copy()
-        d.ctrl[6] = 255.0
-        mujoco.mj_forward(m, d)
-
-    tip_final = d.site_xpos[tip_site_id].copy()
-    pos_err = np.linalg.norm(target_pos - tip_final)
-    ori_err = np.linalg.norm(orientation_error(d, ori_site_id, R_TOOL0_DES))
-    return d.qpos[:6].copy(), pos_err, ori_err
 
 
 def compute_gravity_ctrl(
@@ -185,7 +130,17 @@ def main() -> None:
 
     for i, q0 in enumerate(candidates):
         mujoco.mj_resetData(m, d)
-        q, perr, oerr = solve_ik(m, d, tip_site_id, ori_site_id, target_tip, q0, gripper_qpos)
+        q, perr, oerr = solve_ik(
+            m,
+            d,
+            tip_site_id,
+            ori_site_id,
+            target_tip,
+            R_TOOL0_DES,
+            q0,
+            gripper_qpos,
+            verbose=True,
+        )
         # Score weights orientation (rad) and position (m) together so a candidate
         # that nails the target but tips the tool over is not selected.
         score = perr + 0.1 * oerr
@@ -199,7 +154,7 @@ def main() -> None:
     d.qpos[:6] = best_q
     d.qpos[6:14] = gripper_qpos
     d.ctrl[:6] = best_q
-    d.ctrl[6] = 255.0
+    d.ctrl[6] = GRIPPER_CLOSED_CTRL
     mujoco.mj_forward(m, d)
     tip_fk = d.site_xpos[tip_site_id].copy()
     best_perr = np.linalg.norm(target_tip - tip_fk)
