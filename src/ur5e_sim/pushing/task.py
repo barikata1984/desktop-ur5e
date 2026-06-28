@@ -18,12 +18,14 @@ import mujoco
 import numpy as np
 
 from ur5e_sim.core.ik import ORI_GAIN, damped_pinv, get_jacobian6, orientation_error
-from ur5e_sim.core.renderer import FrameRenderer, encode_video
+from ur5e_sim.core.renderer import FrameRenderer
+from ur5e_sim.pushing.viz.grid_video import render_grid_video
 from ur5e_sim.core.sensors import ContactSensor
 from ur5e_sim.pushing.config import SimConfig
 from ur5e_sim.pushing.io import Log, create_trial_dir, dump_config
 from ur5e_sim.pushing.kinematics import R_TOOL0_DES, pusher_in_slider_body, slider_pose_from_data
 from ur5e_sim.pushing.mpc import PusherSliderMPC
+from ur5e_sim.pushing.scene import build_push_model
 
 # pinch sits PINCH_TO_PAD_FRONT behind the closed pad front face (the
 # surface that actually contacts the slider). The keyframe starts the pad ~7 mm
@@ -78,26 +80,23 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
     print(f"Trial directory: {trial_dir}")
     dump_config(cfg, trial_dir)
 
-    m = mujoco.MjModel.from_xml_path(cfg.scene_path)
-    d = mujoco.MjData(m)
+    m, d = build_push_model()
 
-    tip_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "pinch")
+    tip_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "gripper_pinch")
     tool0_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "attachment_site")
     slider_body_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "slider")
-    key_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_KEY, "ready")
     pad_geom_ids = [
         mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, name)
         for name in [
-            "right_pad1",
-            "right_pad2",
-            "left_pad1",
-            "left_pad2",
+            "gripper_right_pad1",
+            "gripper_right_pad2",
+            "gripper_left_pad1",
+            "gripper_left_pad2",
         ]
     ]
     slider_geom_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_GEOM, "slider_geom")
     contact_sensor = ContactSensor(pad_geom_ids, slider_geom_id)
 
-    mujoco.mj_resetDataKeyframe(m, d, key_id)
     mujoco.mj_forward(m, d)
 
     tip_init = d.site_xpos[tip_site_id].copy()
@@ -279,7 +278,7 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
     log.to_npz(trial_dir / "data.npz")
     print(f"Data saved: {trial_dir / 'data.npz'}")
 
-    print("\nEncoding video...")
-    encode_video(pics_dir, trial_dir / "push_sim.mp4", cfg.render.fps)
+    print("\nRendering grid video...")
+    render_grid_video(trial_dir)
 
     return log, trial_dir

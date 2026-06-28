@@ -7,7 +7,7 @@ lights, planar reflection off) and the goal marker visible. The overview pane
 carries a time / slider-y overlay.
 
 Usage:
-    pixi run python scripts/render_video.py <trial_dir> [scene.xml]
+    pixi run python scripts/render_video.py <trial_dir>
 
 Expects ``data.npz`` to contain ``joint_pos`` (N x 6 arm angles) and the slider
 pose series ``slider_x``, ``slider_y``, ``slider_quat`` (N x 4, w x y z), as
@@ -23,9 +23,8 @@ import mujoco
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-from ur5e_sim.pushing import paths
+from ur5e_sim.pushing.scene import build_push_model
 
-SCENE_DEFAULT = paths.scene_path()
 PANE_W, PANE_H = 480, 360
 FPS = 30
 SLIDER_Z = 0.342  # slider rests on the work surface; z is not logged
@@ -51,10 +50,9 @@ def apply_antiglare(m: mujoco.MjModel) -> None:
         m.light_specular[i] = [0.0, 0.0, 0.0]
 
 
-def render_grid_video(trial_dir: Path, scene: str = SCENE_DEFAULT) -> Path:
-    m = mujoco.MjModel.from_xml_path(scene)
+def render_grid_video(trial_dir: Path) -> Path:
+    m, d = build_push_model()
     apply_antiglare(m)
-    d = mujoco.MjData(m)
 
     key = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_KEY, "ready")
     grip_closed = m.key_qpos[key][6:14].copy()

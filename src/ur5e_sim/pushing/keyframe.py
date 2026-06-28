@@ -27,8 +27,8 @@ import mujoco
 import numpy as np
 
 from ur5e_sim.core.ik import damped_pinv, get_jacobian6, orientation_error
-from ur5e_sim.pushing import paths
 from ur5e_sim.pushing.kinematics import R_TOOL0_DES
+from ur5e_sim.pushing.scene import build_push_model
 
 
 def close_gripper_sim(
@@ -132,10 +132,9 @@ def compute_gravity_ctrl(
 
 
 def main() -> None:
-    m = mujoco.MjModel.from_xml_path(paths.scene_path())
-    d = mujoco.MjData(m)
+    m, d = build_push_model()
 
-    tip_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "pinch")
+    tip_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "gripper_pinch")
     ori_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "attachment_site")
     base_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "base")
 
