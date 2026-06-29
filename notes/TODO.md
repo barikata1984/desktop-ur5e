@@ -23,3 +23,4 @@
 - [x] MjSpec.attach() によるモデルビルダー実装 (src/ur5e_sim/core/model_builder.py)
 - [x] FT300s スタンドアロン XML 作成 (scenes/common/sensors/ft300s.xml)
 - [x] 全同定スクリプトを build_ur5e_model() に移行
+- [ ] 残存 xfail 2 件のテスト設計修正: `test_playback_and_estimation_pipeline` の期待値をセンサー先端側全質量 (~2.0 kg) に修正するか質量絶対値検証を除外する; `test_feasible` の検証条件を制約緩和・リスタート増・余裕 > -0.1 のいずれかに緩和する
