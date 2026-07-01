@@ -275,11 +275,16 @@ class PusherSliderMPC:
         vt > gamma_t vn (Eq. 6), sliding down when vt < gamma_b vn (Eq. 7).
         Points at the cone boundary (within tol) are classified as sticking.
 
+        The QP enforces vn >= 0, but SLSQP may return a tiny negative vn due to
+        numerical slack. Any non-positive vn (including a slight numerical leak)
+        represents "no normal contact motion", so we fall back to sticking rather
+        than dividing by a near-zero (possibly wrong-signed) vn.
+
         Returns:
             mode: 1=stick, 2=slide_up, 3=slide_down.
         """
         gamma_t, gamma_b = self._motion_cone(px_a, py_a)
-        if abs(vn) < 1e-12:
+        if vn <= 1e-12:
             return 1
         ratio = vt / vn
         if ratio > gamma_t + tol:
@@ -301,6 +306,13 @@ class PusherSliderMPC:
         (deviation #2 in the module docstring). The receding-horizon re-solve
         bounds the resulting error, but within-horizon state variation of B is
         ignored.
+
+        The QP caller (`_solve_single_schedule`) linearises the motion-cone
+        constraints around the free-response predicted py_a at each step (drawn
+        from the x_free returned here) rather than freezing them at x0[3]. With
+        A=0 the free response is constant, so the two are numerically identical
+        today; once a proper nominal trajectory linearisation is added, the
+        per-step cone will track py_a through the horizon.
 
         Since A=0, x_{k+1} = x_k + dt*B_k*u_k.
         Unrolling: x_{k+1} = x_0 + dt * sum_{j=0}^{k} B_j * u_j.
@@ -422,15 +434,24 @@ class PusherSliderMPC:
 
         H = 0.5 * (H + H.T) + 1e-8 * np.eye(n_vars)
 
-        # Motion cone constraints in aligned frame
-        py_a = x0[3]
-        gamma_t, gamma_b = self._motion_cone(px_a, py_a)
+        # Motion cone constraints in aligned frame.
+        # Linearise the cone at each step's free-response predicted py_a rather
+        # than freezing at x0[3]. In slide modes B[3, :] is non-zero, so py_a
+        # evolves over the horizon and a cone frozen at x0 becomes systematically
+        # wrong. Using x_free ignores u's effect on py_a, so this is still an
+        # approximation, but strictly better than freezing at x0.
+        py_a_predicted = x_free.reshape(N, 4)[:, 3]  # (N,)
+        gamma_t_arr = np.empty(N)
+        gamma_b_arr = np.empty(N)
+        for k in range(N):
+            gamma_t_arr[k], gamma_b_arr[k] = self._motion_cone(px_a, py_a_predicted[k])
 
         A_ineq_rows = []
         b_ineq_rows = []
 
         for n in range(N):
             mode = schedule[n]
+            gamma_t, gamma_b = gamma_t_arr[n], gamma_b_arr[n]
             if mode == 1:
                 # Sticking: gamma_b * vn <= vt <= gamma_t * vn
                 # Upper: vt - gamma_t * vn <= 0

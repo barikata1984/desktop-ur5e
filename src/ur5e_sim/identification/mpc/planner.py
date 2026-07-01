@@ -90,6 +90,7 @@ def _make_objective(
     W_accumulated: np.ndarray | None,
 ) -> Callable[[np.ndarray], float]:
     body_name = config.body_name
+    ft_site_name = config.ft_site_name
     subsample = config.horizon.subsample_factor
 
     def objective(x: np.ndarray) -> float:
@@ -103,6 +104,7 @@ def _make_objective(
                 sample.acceleration,
                 body_name,
                 subsample_factor=subsample,
+                site_name=ft_site_name,
             )
             W = np.vstack([W_accumulated, W_new]) if W_accumulated is not None else W_new
             return compute_condition_number(W)

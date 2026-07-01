@@ -832,6 +832,7 @@ class ExcitationOptimizer:
                         # Cancel remaining futures (best-effort)
                         for f in futures:
                             f.cancel()
+                        break
 
         wall_time = time.perf_counter() - t0
 
@@ -910,6 +911,7 @@ class ExcitationOptimizer:
             q0,
             with_ft_offset=cfg.with_ft_offset,
             column_scale=cfg.ft_offset_column_scale and cfg.with_ft_offset,
+            site_name=cfg.site_name,
         )
 
         _, full_constraints = self._build_cache_and_constraints()

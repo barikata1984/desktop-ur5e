@@ -180,13 +180,16 @@ class CollisionChecker:
         )  # (8, 3)
 
     def _run_kinematics(self, q: np.ndarray) -> None:
-        """Set qpos and run forward kinematics (once)."""
-        if q.shape[0] < self.model.nq:
-            padded = np.zeros(self.model.nq, dtype=np.float64)
-            padded[: q.shape[0]] = q
-            self.data.qpos[:] = padded
-        else:
-            self.data.qpos[:] = q
+        """Write arm qpos and run forward kinematics.
+
+        Non-arm DoFs (e.g. gripper joints) in ``data.qpos[n:]`` are left
+        untouched so that a payload's world pose reflects the caller's
+        current gripper state instead of a hard-coded zero configuration.
+        """
+        n = q.shape[0]
+        if n > self.model.nq:
+            raise ValueError(f"q has {n} elements but model.nq is {self.model.nq}")
+        self.data.qpos[:n] = q
         mujoco.mj_kinematics(self.model, self.data)
 
     def _get_link_positions(self) -> np.ndarray:

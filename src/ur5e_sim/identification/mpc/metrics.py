@@ -66,6 +66,9 @@ def gravity_sweep_angle(
     Sums the angle between gravity directions at consecutive sampled frames.
     Larger values indicate better excitation of the gravity-dependent
     parameters (mass, first moment).
+
+    ``body_name`` defaults to the unprefixed name from the direct-XML scene.
+    For assembled models (``build_ur5e_model``), pass the prefixed name.
     """
     directions = _gravity_directions_body(model, data, q_trajectory, body_name, subsample)
     return _sweep_from_directions(directions)
@@ -78,7 +81,11 @@ def gravity_direction_spread(
     body_name: str = "payload_box_mount",
     subsample: int = 1,
 ) -> float:
-    """Maximum opening angle from the mean gravity direction in the body frame [rad]."""
+    """Maximum opening angle from the mean gravity direction in the body frame [rad].
+
+    ``body_name`` defaults to the unprefixed name from the direct-XML scene.
+    For assembled models (``build_ur5e_model``), pass the prefixed name.
+    """
     directions = _gravity_directions_body(model, data, q_trajectory, body_name, subsample)
     return _spread_from_directions(directions)
 
@@ -94,7 +101,11 @@ def trajectory_excitation_summary(
     trajectory: TrajectorySample,
     body_name: str = "payload_box_mount",
 ) -> dict[str, float]:
-    """Aggregate excitation-quality metrics for a trajectory."""
+    """Aggregate excitation-quality metrics for a trajectory.
+
+    ``body_name`` defaults to the unprefixed name from the direct-XML scene.
+    For assembled models (``build_ur5e_model``), pass the prefixed name.
+    """
     directions = _gravity_directions_body(model, data, trajectory.position, body_name, 1)
     return {
         "gravity_sweep_angle": _sweep_from_directions(directions),

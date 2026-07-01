@@ -161,7 +161,10 @@ class RecursiveTotalLeastSquares:
         v = self._Vt[min_idx, :]
         if abs(v[-1]) < 1e-15:
             return  # keep previous estimate
-        self._phi = -v[:-1] / v[-1]
+        phi_candidate = -v[:-1] / v[-1]
+        if phi_candidate[0] <= 0.0:
+            return  # keep previous estimate (mass must be positive)
+        self._phi = phi_candidate
 
     def _svd_update_block(self, new_rows: np.ndarray) -> None:
         """Brand's incremental SVD update for a block of rows."""

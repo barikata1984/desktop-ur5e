@@ -107,10 +107,14 @@ def sample_body_kinematics(
     """Body kinematics about a force/torque sensor site.
 
     The regressor is always evaluated about the FT sensor site so it matches the
-    sensor's interaction force (cfrc_int). ``site_name`` defaults to ``ft_sensor``;
-    a model without that site raises ValueError (FT-less models are unsupported).
+    sensor's interaction force (cfrc_int). The caller must specify ``site_name``
+    explicitly — the correct value depends on how the model was built (e.g.
+    ``"ft_sensor"`` for a direct-XML scene vs ``"ft300s_ft_sensor"`` for an
+    assembled model from ``build_ur5e_model``).
     """
-    return _sample_site_kinematics(model, data, body_name, site_name or "ft_sensor")
+    if site_name is None:
+        raise ValueError("site_name must be specified")
+    return _sample_site_kinematics(model, data, body_name, site_name)
 
 
 def trajectory_subsample_indices(num_samples: int, subsample_factor: int) -> range:

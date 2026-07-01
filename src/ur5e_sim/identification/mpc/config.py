@@ -48,9 +48,14 @@ class MPCConfig:
     q0: np.ndarray | None = None  # initial position (None -> _UR5E_HOME)
     joint_limits: JointLimits = field(default_factory=JointLimits)
 
-    # MuJoCo identifiers
+    # MuJoCo identifiers — defaults match the direct-XML scene
+    # (scenes/tasks/identification.xml, unprefixed names). When using a model
+    # assembled via build_ur5e_model(), pass prefixed names explicitly (e.g.
+    # body_name="payload_payload_box_mount", site_name="ft300s_ft_sensor",
+    # ft_site_name="ft300s_ft_sensor").
     body_name: str = "payload_box_mount"
-    site_name: str = "attachment_site"
+    site_name: str = "attachment_site"  # EE pose frame (for playback)
+    ft_site_name: str = "ft_sensor"  # FT sensor site (for regressor sampling)
     model_path: str = "assets/ur5e/mjcf/scene_with_box.xml"
 
     # Execution

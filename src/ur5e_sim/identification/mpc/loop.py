@@ -141,6 +141,7 @@ class MPCLoop:
                 dq_meas,
                 ddq_meas,
                 cfg.body_name,
+                site_name=cfg.ft_site_name,
             )
             y_new = wrench.ravel()
 
@@ -187,7 +188,7 @@ class MPCLoop:
 
             if prev_cond is not None and prev_cond > 0:
                 rel_improvement = (prev_cond - cond_accumulated) / prev_cond
-                if rel_improvement < cfg.convergence_threshold:
+                if 0.0 <= rel_improvement < cfg.convergence_threshold:
                     converged = True
                     break
             prev_cond = cond_accumulated
