@@ -20,6 +20,7 @@ from ur5e_sim.trajectories import (  # noqa: E402
 from .conftest import SCENE_PATH, arm_to_full_qpos, arm_to_full_qvel  # noqa: E402
 
 PAYLOAD_BODY_NAME = "payload_box_mount"
+FT_SITE_NAME = "ft_sensor"
 Q0_ARM = np.array(
     [
         np.pi / 2,
@@ -93,7 +94,7 @@ def test_body_inertial_parameters_extract_expected_payload_values() -> None:
 
 def test_sample_body_regressor_has_expected_shape() -> None:
     loaded = _load_payload_scene()
-    sample = sample_body_regressor(loaded.model, loaded.data, PAYLOAD_BODY_NAME)
+    sample = sample_body_regressor(loaded.model, loaded.data, PAYLOAD_BODY_NAME, FT_SITE_NAME)
 
     assert sample.regressor.shape == (6, 10)
     assert sample.kinematics.body_name == PAYLOAD_BODY_NAME
@@ -109,7 +110,7 @@ def test_static_pose_regressor_predicts_gravity_wrench() -> None:
         np.zeros(loaded.model.nv),
         np.zeros(loaded.model.nv),
     )
-    sample = sample_body_regressor(loaded.model, loaded.data, PAYLOAD_BODY_NAME)
+    sample = sample_body_regressor(loaded.model, loaded.data, PAYLOAD_BODY_NAME, FT_SITE_NAME)
     wrench = compute_wrench_from_parameters(sample.regressor, parameters)
 
     assert wrench.shape == (6,)
@@ -133,6 +134,7 @@ def test_stacked_body_regressor_shape_and_condition_number_change_with_motion() 
         static_dq,
         static_ddq,
         PAYLOAD_BODY_NAME,
+        site_name=FT_SITE_NAME,
     )
 
     dynamic_arm = _trajectory_arm(scale=0.2)
@@ -145,6 +147,7 @@ def test_stacked_body_regressor_shape_and_condition_number_change_with_motion() 
         dynamic.acceleration,
         PAYLOAD_BODY_NAME,
         subsample_factor=10,
+        site_name=FT_SITE_NAME,
     )
 
     assert static_regressor.shape == (21 * 6, 10)
@@ -191,7 +194,7 @@ def test_dynamic_trajectory_regressor_predicts_wrench() -> None:
         dynamic.velocity[idx],
         dynamic.acceleration[idx],
     )
-    sample = sample_body_regressor(loaded.model, loaded.data, PAYLOAD_BODY_NAME)
+    sample = sample_body_regressor(loaded.model, loaded.data, PAYLOAD_BODY_NAME, FT_SITE_NAME)
     wrench = compute_wrench_from_parameters(sample.regressor, parameters)
 
     assert wrench.shape == (6,)
@@ -224,6 +227,7 @@ def _stacked_kwargs(loaded, sample_arm):
         ddq=padded.acceleration,
         body_name=PAYLOAD_BODY_NAME,
         subsample_factor=10,
+        site_name=FT_SITE_NAME,
     )
 
 

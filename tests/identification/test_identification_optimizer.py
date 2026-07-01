@@ -33,6 +33,8 @@ BASE_FREQ = 0.2
 DURATION = 4.0
 FPS = 50.0
 Q0 = np.array([np.pi / 2, -np.pi / 2, np.pi / 2, -np.pi / 2, -np.pi / 2, 0.0])
+BODY_NAME = "payload_box_mount"
+FT_SITE_NAME = "ft_sensor"
 
 
 def _load_scene():
@@ -71,8 +73,9 @@ def test_objective_returns_finite_for_random_coefficients() -> None:
         cache,
         loaded.model,
         loaded.data,
-        body_name="payload_box_mount",
+        body_name=BODY_NAME,
         subsample_factor=5,
+        site_name=FT_SITE_NAME,
     )
     assert np.isfinite(cond)
     assert cond > 0
@@ -88,8 +91,9 @@ def test_objective_returns_large_value_for_zero_coefficients() -> None:
         cache,
         loaded.model,
         loaded.data,
-        body_name="payload_box_mount",
+        body_name=BODY_NAME,
         subsample_factor=5,
+        site_name=FT_SITE_NAME,
     )
     # Zero coefficients produce a degenerate (static) trajectory:
     # condition number should be inf or very large
@@ -109,8 +113,9 @@ def test_d_optimal_returns_finite_for_random_coefficients() -> None:
         cache,
         loaded.model,
         loaded.data,
-        body_name="payload_box_mount",
+        body_name=BODY_NAME,
         subsample_factor=5,
+        site_name=FT_SITE_NAME,
     )
     assert np.isfinite(val)
 
@@ -125,8 +130,9 @@ def test_d_optimal_returns_large_value_for_zero_coefficients() -> None:
         cache,
         loaded.model,
         loaded.data,
-        body_name="payload_box_mount",
+        body_name=BODY_NAME,
         subsample_factor=5,
+        site_name=FT_SITE_NAME,
     )
     # Degenerate trajectory -> near-zero singular values -> large positive D-optimal value
     assert val > 100
@@ -141,10 +147,22 @@ def test_d_optimal_decreases_with_better_trajectory() -> None:
     x_larger = _make_x(scale=0.05, seed=0)
 
     val_small = d_optimal_objective(
-        x_small, cache, loaded.model, loaded.data, "payload_box_mount", 5
+        x_small,
+        cache,
+        loaded.model,
+        loaded.data,
+        BODY_NAME,
+        5,
+        site_name=FT_SITE_NAME,
     )
     val_larger = d_optimal_objective(
-        x_larger, cache, loaded.model, loaded.data, "payload_box_mount", 5
+        x_larger,
+        cache,
+        loaded.model,
+        loaded.data,
+        BODY_NAME,
+        5,
+        site_name=FT_SITE_NAME,
     )
     # Larger amplitude -> better excitation -> larger singular values -> more negative D-optimal
     assert val_larger < val_small
@@ -363,6 +381,8 @@ def test_validate_trajectory_returns_expected_keys() -> None:
         n_monte_carlo=1,
         max_iter_per_start=2,
         seed=0,
+        body_name=BODY_NAME,
+        site_name=FT_SITE_NAME,
     )
     opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
 
