@@ -34,7 +34,7 @@ class MPCStepLog:
     n_samples_total: int
     wall_time_plan: float
     wall_time_execute: float
-    executed_q: np.ndarray | None = None  # (N, 6) joint positions actually executed
+    executed_q: np.ndarray | None = None  # (N, nj) joint positions actually executed
 
 
 @dataclass
@@ -84,7 +84,7 @@ class MPCLoop:
         self._model = model
         self._data = data
         self._planner = ExcitationPlanner(config, model, data)
-        self._rtls = RecursiveTotalLeastSquares(RTLSConfig(n_params=10))
+        self._rtls = RecursiveTotalLeastSquares(RTLSConfig(n_params=config.n_inertial_params))
         self._playback = TrajectoryPlayback(
             model,
             data,
@@ -101,7 +101,7 @@ class MPCLoop:
         cfg = self._config
         q_current = cfg.q0.copy()
         dq_current = np.zeros(cfg.num_joints)
-        W_accumulated: np.ndarray | None = None
+        W_blocks: list[np.ndarray] = []
         steps: list[MPCStepLog] = []
         prev_cond: float | None = None
         cond_accumulated = float("nan")
@@ -116,6 +116,7 @@ class MPCLoop:
                 flush=True,
             )
             t_plan = time.perf_counter()
+            W_accumulated = np.vstack(W_blocks) if W_blocks else None
             plan_result = self._planner.plan(q_current, dq_current, W_accumulated)
             wall_plan = time.perf_counter() - t_plan
 
@@ -145,11 +146,8 @@ class MPCLoop:
             )
             y_new = wrench.ravel()
 
-            if W_accumulated is None:
-                W_accumulated = W_new
-            else:
-                W_accumulated = np.vstack([W_accumulated, W_new])
-
+            W_blocks.append(W_new)
+            W_accumulated = np.vstack(W_blocks)
             cond_accumulated = compute_condition_number(W_accumulated)
 
             if not self._rtls._initialized:
@@ -194,7 +192,8 @@ class MPCLoop:
             prev_cond = cond_accumulated
 
         total_time = time.perf_counter() - t0
-        total_samples = W_accumulated.shape[0] // 6 if W_accumulated is not None else 0
+        W_all = np.vstack(W_blocks) if W_blocks else None
+        total_samples = W_all.shape[0] // 6 if W_all is not None else 0
 
         return MPCResult(
             steps=steps,

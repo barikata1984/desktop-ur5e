@@ -96,6 +96,9 @@ def load_optimization_result(path: str | Path) -> OptimizationResult:
         n_restarts=int(payload["n_restarts"]),
         best_start_index=int(payload["best_start_index"]),
         restart_history=payload.get("restart_history", []),
+        feasible=payload.get("feasible", False),
+        constraint_margins=payload.get("constraint_margins", {}),
+        trajectory_stats=payload.get("trajectory_stats", {}),
     )
 
 

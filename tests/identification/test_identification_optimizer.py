@@ -233,6 +233,8 @@ def test_optimize_smoke() -> None:
         n_monte_carlo=2,
         max_iter_per_start=5,
         seed=123,
+        body_name=BODY_NAME,
+        site_name=FT_SITE_NAME,
     )
     opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
     result = opt.optimize()
@@ -264,6 +266,8 @@ def test_optimize_smoke_d_optimal() -> None:
         max_iter_per_start=5,
         objective_type="d_optimal",
         seed=123,
+        body_name=BODY_NAME,
+        site_name=FT_SITE_NAME,
     )
     opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
     result = opt.optimize()

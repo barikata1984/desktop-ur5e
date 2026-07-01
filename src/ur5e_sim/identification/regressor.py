@@ -22,15 +22,9 @@ def _skew(vector: np.ndarray) -> np.ndarray:
 
 
 def _quat_to_rotation_matrix(quaternion_wxyz: np.ndarray) -> np.ndarray:
-    w, x, y, z = np.asarray(quaternion_wxyz, dtype=np.float64)
-    return np.array(
-        [
-            [1.0 - 2.0 * (y * y + z * z), 2.0 * (x * y - z * w), 2.0 * (x * z + y * w)],
-            [2.0 * (x * y + z * w), 1.0 - 2.0 * (x * x + z * z), 2.0 * (y * z - x * w)],
-            [2.0 * (x * z - y * w), 2.0 * (y * z + x * w), 1.0 - 2.0 * (x * x + y * y)],
-        ],
-        dtype=np.float64,
-    )
+    result = np.empty(9, dtype=np.float64)
+    mujoco.mju_quat2Mat(result, np.asarray(quaternion_wxyz, dtype=np.float64))
+    return result.reshape(3, 3)
 
 
 def _spatial_inertia_matrix_from_vector(parameter_vector: np.ndarray) -> np.ndarray:

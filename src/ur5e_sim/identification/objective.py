@@ -54,8 +54,8 @@ def condition_number_objective(
 ) -> float:
     """Compute condition number of the stacked body regressor.
 
-    Returns a large finite value (1e12) on numerical failure to avoid
-    crashing the optimizer.
+    Returns inf on numerical failure (degenerate trajectory) to steer
+    the optimizer away.
     """
     try:
         stacked = _compute_stacked_regressor(
@@ -69,8 +69,8 @@ def condition_number_objective(
             site_name=site_name,
         )
         return compute_condition_number(stacked, column_scale=column_scale)
-    except (np.linalg.LinAlgError, ValueError):
-        return 1e12
+    except np.linalg.LinAlgError:
+        return float("inf")
 
 
 def d_optimal_objective(
@@ -100,8 +100,8 @@ def d_optimal_objective(
         sv = np.linalg.svd(stacked, compute_uv=False)
         sv_floored = np.maximum(sv, 1e-30)
         return -2.0 * np.sum(np.log(sv_floored))
-    except (np.linalg.LinAlgError, ValueError):
-        return 1e12
+    except np.linalg.LinAlgError:
+        return float("inf")
 
 
 def d_optimal_with_cond(
@@ -140,8 +140,8 @@ def d_optimal_with_cond(
         else:
             cond = float(sv[0] / sv[-1])
         return d_opt, cond
-    except (np.linalg.LinAlgError, ValueError):
-        return 1e12, 1e12
+    except np.linalg.LinAlgError:
+        return float("inf"), float("inf")
 
 
 def evaluate_full_resolution(

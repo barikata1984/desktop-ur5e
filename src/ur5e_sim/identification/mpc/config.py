@@ -56,7 +56,7 @@ class MPCConfig:
     body_name: str = "payload_box_mount"
     site_name: str = "attachment_site"  # EE pose frame (for playback)
     ft_site_name: str = "ft_sensor"  # FT sensor site (for regressor sampling)
-    model_path: str = "assets/ur5e/mjcf/scene_with_box.xml"
+    n_inertial_params: int = 10  # inertial parameter count for RTLS
 
     # Execution
     use_pd_control: bool = False

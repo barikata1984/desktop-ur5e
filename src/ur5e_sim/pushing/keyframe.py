@@ -26,6 +26,7 @@ from __future__ import annotations
 import mujoco
 import numpy as np
 
+from ur5e_sim.core.env import get_named_object_id
 from ur5e_sim.core.ik import GRIPPER_CLOSED_CTRL, orientation_error, solve_ik
 from ur5e_sim.pushing.kinematics import R_TOOL0_DES
 from ur5e_sim.pushing.scene import build_push_model
@@ -79,9 +80,15 @@ def compute_gravity_ctrl(
 def main() -> None:
     m, d = build_push_model()
 
-    tip_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "gripper_pinch")
-    ori_site_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "attachment_site")
-    base_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_BODY, "base")
+    tip_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, "gripper_pinch")
+    if tip_site_id is None:
+        raise ValueError("Site 'gripper_pinch' not found in model")
+    ori_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, "attachment_site")
+    if ori_site_id is None:
+        raise ValueError("Site 'attachment_site' not found in model")
+    base_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_BODY, "base")
+    if base_id is None:
+        raise ValueError("Body 'base' not found in model")
 
     print(f"Model nq={m.nq}, nv={m.nv}, nu={m.nu}")
     print("Base body pos:", m.body_pos[base_id])

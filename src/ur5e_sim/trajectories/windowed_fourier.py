@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .base import TrajectorySample
+from .base import BaseTrajectory, TrajectorySample
 from .fourier import FourierTrajectory, FourierTrajectoryConfig
 from .window import WindowTrajectory, WindowTrajectoryConfig
 
@@ -12,8 +12,9 @@ class WindowedFourierTrajectoryConfig(FourierTrajectoryConfig):
     pass
 
 
-class WindowedFourierTrajectory:
+class WindowedFourierTrajectory(BaseTrajectory):
     def __init__(self, config: WindowedFourierTrajectoryConfig) -> None:
+        super().__init__(config)
         self.config = config
         self._fourier = FourierTrajectory(
             FourierTrajectoryConfig(
@@ -34,10 +35,6 @@ class WindowedFourierTrajectory:
             )
         )
         self._base = FourierTrajectory._parse_q0(config.q0, config.num_joints)
-
-    @property
-    def time(self):
-        return self._fourier.time
 
     def sample(self) -> TrajectorySample:
         oscillation = self._fourier.sample()

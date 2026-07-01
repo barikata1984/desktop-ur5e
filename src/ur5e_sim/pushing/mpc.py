@@ -221,14 +221,11 @@ class PusherSliderMPC:
             P = np.eye(2)
             b_vec = np.array([(-py_a) / denom, px_a / denom])
             c_vec = np.array([0.0, 0.0])
-        elif mode == 2:  # sliding up
-            P = np.array([[1.0, 0.0], [gamma_t, 0.0]])
-            b_vec = np.array([(-py_a + gamma_t * px_a) / denom, 0.0])
-            c_vec = np.array([-gamma_t, 0.0])
-        elif mode == 3:  # sliding down
-            P = np.array([[1.0, 0.0], [gamma_b, 0.0]])
-            b_vec = np.array([(-py_a + gamma_b * px_a) / denom, 0.0])
-            c_vec = np.array([-gamma_b, 0.0])
+        elif mode in (2, 3):  # sliding up / down
+            gamma = gamma_t if mode == 2 else gamma_b
+            P = np.array([[1.0, 0.0], [gamma, 0.0]])
+            b_vec = np.array([(-py_a + gamma * px_a) / denom, 0.0])
+            c_vec = np.array([-gamma, 0.0])
         else:
             raise ValueError(f"Unknown mode {mode}")
 

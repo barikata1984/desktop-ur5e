@@ -100,19 +100,36 @@ def build_trajectory_from_params(
     return WindowedFourierTrajectory(config).sample()
 
 
+def _make_joint_kinematic_constraint(
+    cache: _TrajectoryCache,
+    limit_lower: np.ndarray,
+    limit_upper: np.ndarray,
+    attr_name: str,
+    label: str,
+) -> Callable[[np.ndarray], float]:
+    def constraint(x: np.ndarray) -> float:
+        sample = cache.get(x)
+        values = getattr(sample, attr_name)
+        nj = values.shape[1]
+        if limit_lower.shape[0] != nj:
+            raise ValueError(
+                f"{label}: limit has {limit_lower.shape[0]} elements but trajectory has {nj} joints"
+            )
+        margin_lo = values - limit_lower
+        margin_hi = limit_upper - values
+        return float(np.min([margin_lo, margin_hi]))
+
+    return constraint
+
+
 def make_joint_position_constraint(
     cache: _TrajectoryCache,
     joint_limits: JointLimits,
 ) -> Callable[[np.ndarray], float]:
     """Return f(x)->float >= 0 iff all joint positions within limits."""
-
-    def constraint(x: np.ndarray) -> float:
-        sample = cache.get(x)
-        margin_lo = sample.position - joint_limits.q_min
-        margin_hi = joint_limits.q_max - sample.position
-        return float(np.min([margin_lo, margin_hi]))
-
-    return constraint
+    return _make_joint_kinematic_constraint(
+        cache, joint_limits.q_min, joint_limits.q_max, "position", "position"
+    )
 
 
 def make_joint_velocity_constraint(
@@ -120,13 +137,9 @@ def make_joint_velocity_constraint(
     joint_limits: JointLimits,
 ) -> Callable[[np.ndarray], float]:
     """Return f(x)->float >= 0 iff all joint velocities within limits."""
-
-    def constraint(x: np.ndarray) -> float:
-        sample = cache.get(x)
-        margin = joint_limits.dq_max - np.abs(sample.velocity)
-        return float(np.min(margin))
-
-    return constraint
+    return _make_joint_kinematic_constraint(
+        cache, -joint_limits.dq_max, joint_limits.dq_max, "velocity", "velocity"
+    )
 
 
 def make_joint_acceleration_constraint(
@@ -134,13 +147,9 @@ def make_joint_acceleration_constraint(
     joint_limits: JointLimits,
 ) -> Callable[[np.ndarray], float]:
     """Return f(x)->float >= 0 iff all joint accelerations within limits."""
-
-    def constraint(x: np.ndarray) -> float:
-        sample = cache.get(x)
-        margin = joint_limits.ddq_max - np.abs(sample.acceleration)
-        return float(np.min(margin))
-
-    return constraint
+    return _make_joint_kinematic_constraint(
+        cache, -joint_limits.ddq_max, joint_limits.ddq_max, "acceleration", "acceleration"
+    )
 
 
 def compute_fourier_bounds(

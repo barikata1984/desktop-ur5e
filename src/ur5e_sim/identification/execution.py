@@ -94,7 +94,7 @@ class TrajectoryPlayback:
 
         # Pad trajectory to model DOFs when it covers only a subset (e.g. 6 arm
         # joints on a 14-DOF model with gripper). Extra DOFs are held at zero.
-        nq, nv = model.nq, model.nv
+        nq, nv, nu = model.nq, model.nv, model.nu
         if n_joints < nq:
             pad_q = nq - n_joints
             pad_v = nv - n_joints
@@ -126,7 +126,7 @@ class TrajectoryPlayback:
         # carry a large acceleration spike unrelated to the desired trajectory.
         if cfg.use_pd_control and cfg.settle_time > 0.0:
             q_start = trajectory.position[0]
-            data.ctrl[:n_joints] = q_start
+            data.ctrl[:] = trajectory.position[0][:nu]
             n_settle = max(1, round(cfg.settle_time / model.opt.timestep))
             for _ in range(n_settle):
                 mujoco.mj_step(model, data)
@@ -140,13 +140,13 @@ class TrajectoryPlayback:
             if cfg.use_pd_control:
                 # Servo-tracking mode: feed the target angle to the built-in
                 # position-velocity servos and integrate the full trajectory dt.
-                data.ctrl[:n_joints] = q_des
+                data.ctrl[:] = q_des[:nu]
                 for _ in range(n_substeps):
                     mujoco.mj_step(model, data)
 
-                q_meas = np.array(data.qpos[:n_joints], dtype=np.float64)
-                dq_meas = np.array(data.qvel[:n_joints], dtype=np.float64)
-                ddq_meas = np.array(data.qacc[:n_joints], dtype=np.float64)
+                q_meas = np.array(data.qpos[:nq], dtype=np.float64)
+                dq_meas = np.array(data.qvel[:nv], dtype=np.float64)
+                ddq_meas = np.array(data.qacc[:nv], dtype=np.float64)
             else:
                 # Open-loop mode: set state directly. The FT sensor reads the
                 # interaction force (cfrc_int), computed at the acceleration stage.

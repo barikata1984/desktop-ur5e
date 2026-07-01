@@ -135,14 +135,11 @@ def batch_condition_number_warp(
     if stacked.ndim != 3:
         raise ValueError("Expected 3-D array of shape (N, rows, cols)")
 
-    n = stacked.shape[0]
-    cond_numbers = np.empty(n, dtype=np.float64)
-
-    for i in range(n):
-        sv = np.linalg.svd(stacked[i], compute_uv=False)
-        if sv[-1] < singular_value_floor:
-            cond_numbers[i] = float("inf")
-        else:
-            cond_numbers[i] = sv[0] / sv[-1]
+    sv = np.linalg.svd(stacked, compute_uv=False)  # (n, min(rows, cols))
+    cond_numbers = np.where(
+        sv[:, -1] < singular_value_floor,
+        np.inf,
+        sv[:, 0] / sv[:, -1],
+    )
 
     return cond_numbers

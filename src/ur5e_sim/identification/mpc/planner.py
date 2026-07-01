@@ -108,8 +108,8 @@ def _make_objective(
             )
             W = np.vstack([W_accumulated, W_new]) if W_accumulated is not None else W_new
             return compute_condition_number(W)
-        except (np.linalg.LinAlgError, ValueError):
-            return 1e12
+        except np.linalg.LinAlgError:
+            return float("inf")
 
     return objective
 

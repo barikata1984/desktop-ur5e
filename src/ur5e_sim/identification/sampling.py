@@ -52,7 +52,7 @@ def _sample_site_kinematics(
     model: mujoco.MjModel,
     data: mujoco.MjData,
     body_name: str,
-    site_name: str,
+    site_id: int,
 ) -> BodyKinematics:
     """Kinematics about a force/torque sensor site, consistent with cfrc_int.
 
@@ -61,11 +61,10 @@ def _sample_site_kinematics(
     and reference point the FT sensor uses. cacc is populated via mj_inverse
     (which preserves the commanded qacc), so mj_objectAcceleration returns the
     full proper acceleration and no manual gravity term is needed.
-    """
-    site_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_SITE, site_name)
-    if site_id is None:
-        raise ValueError(f"Unknown site name: {site_name}")
 
+    Args:
+        site_id: pre-resolved MuJoCo site id (avoids repeated name lookups).
+    """
     # Populate data.cacc while preserving the commanded qacc. mj_forward would
     # overwrite qacc with the forward-dynamics solution; mj_inverse keeps it and
     # fills cacc via mj_rnePostConstraint, so mj_objectAcceleration returns the
@@ -114,7 +113,10 @@ def sample_body_kinematics(
     """
     if site_name is None:
         raise ValueError("site_name must be specified")
-    return _sample_site_kinematics(model, data, body_name, site_name)
+    site_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_SITE, site_name)
+    if site_id is None:
+        raise ValueError(f"Unknown site name: {site_name}")
+    return _sample_site_kinematics(model, data, body_name, site_id)
 
 
 def trajectory_subsample_indices(num_samples: int, subsample_factor: int) -> range:

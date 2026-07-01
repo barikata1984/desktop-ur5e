@@ -60,13 +60,7 @@ def _pad_sample(sample, nq: int, nv: int) -> TrajectorySample:
 
 
 def test_optimization_and_validation_roundtrip() -> None:
-    """Run a minimal optimization, save/load result, validate it.
-
-    The optimizer internally creates 6-joint trajectories and passes them to
-    model functions expecting nq=14. The objective functions catch ValueError
-    and return fallback values, so optimisation completes but with meaningless
-    condition numbers. The save/load roundtrip is still valid.
-    """
+    """Run a minimal optimization, save/load result, validate it."""
     loaded = _load_scene()
     cfg = OptimizerConfig(
         num_joints=NUM_JOINTS,
@@ -80,6 +74,7 @@ def test_optimization_and_validation_roundtrip() -> None:
         max_iter_per_start=3,
         seed=42,
         body_name=BODY_NAME,
+        site_name="ft_sensor",
     )
     opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
     result = opt.optimize()
@@ -87,6 +82,7 @@ def test_optimization_and_validation_roundtrip() -> None:
     assert isinstance(result, OptimizationResult)
     assert np.isfinite(result.condition_number)
     assert result.condition_number > 0
+    assert result.condition_number < 1e6
 
     with tempfile.TemporaryDirectory() as tmpdir:
         path = Path(tmpdir) / "result.json"

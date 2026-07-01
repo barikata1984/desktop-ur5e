@@ -142,7 +142,10 @@ def main() -> None:
                 box_lower=box_lower, box_upper=box_upper
             )
         except RuntimeError:
-            pass
+            print(
+                "WARNING: workspace region geom not found — workspace constraint disabled",
+                flush=True,
+            )
 
     ee_velocity_config: EeVelocityConfig | None = None
     if config.ee_max_linear_velocity > 0:
