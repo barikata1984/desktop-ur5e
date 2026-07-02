@@ -177,7 +177,7 @@ def main() -> None:
     print(f"Collected {len(buffer)} samples")
 
     print("Building regressor matrices...")
-    A, y_vec = buffer.build_regressor_data(model, data, body_name)
+    A, y_vec = buffer.build_regressor_data(model, data, body_name, opt_result.config.site_name)
     print(f"Regressor shape: A={A.shape}, y={y_vec.shape}")
 
     print(f"Running estimator: {config.estimator}")

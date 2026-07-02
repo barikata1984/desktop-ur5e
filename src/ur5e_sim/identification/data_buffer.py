@@ -89,12 +89,18 @@ class DataBuffer:
         model: mujoco.MjModel,
         data: mujoco.MjData,
         body_name: str,
+        site_name: str,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Build stacked regressor and wrench vectors.
 
         For each stored sample, sets the model state, computes
         the body regressor, and computes the wrench from the
         model's inertial parameters.
+
+        Args:
+            site_name: FT sensor site the regressor is evaluated about (e.g.
+                ``"ft_sensor"`` for a direct-XML scene vs ``"ft300s_ft_sensor"``
+                for an assembled model from ``build_ur5e_model``).
 
         Returns (A_stacked, y_stacked) where:
             A_stacked: (N*6, 10) regressor matrix
@@ -107,7 +113,7 @@ class DataBuffer:
 
         for sample in self._samples:
             set_model_state(model, data, sample.q, sample.dq, sample.ddq, compute_kinematics=False)
-            reg_sample = sample_body_regressor(model, data, body_name)
+            reg_sample = sample_body_regressor(model, data, body_name, site_name)
             regressor_rows.append(reg_sample.regressor)
             wrench = compute_wrench_from_parameters(reg_sample.regressor, params)
             wrench_rows.append(wrench)

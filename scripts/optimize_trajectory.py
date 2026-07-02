@@ -119,10 +119,13 @@ def _build_config() -> OptimizeExcitationConfig:
     return tyro.cli(OptimizeExcitationConfig, default=default)
 
 
+_PAYLOAD_XML = "scenes/objects/payload_flat.xml"
+
+
 def main() -> None:
     config = _build_config()
 
-    model, data = build_ur5e_model(payload_xml="scenes/objects/payload_flat.xml")
+    model, data = build_ur5e_model(payload_xml=_PAYLOAD_XML)
     q0 = np.array(data.qpos[:6], dtype=np.float64)
 
     workspace_config: WorkspaceConstraintConfig | None = None
@@ -192,7 +195,7 @@ def main() -> None:
         with_ft_offset=config.with_ft_offset,
         ft_offset_column_scale=config.ft_offset_column_scale,
         n_workers=config.n_workers,
-        model_path=None,
+        payload_xml=_PAYLOAD_XML,
     )
 
     optimizer = ExcitationOptimizer(config=opt_config, model=model, data=data)

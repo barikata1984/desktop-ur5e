@@ -32,7 +32,13 @@ class PlaybackConfig:
     noise_std_dq: float = 0.0
     noise_std_wrench: float = 0.0
     body_name: str = "payload_box_mount"
+    # Site used to record the EE pose (position/rotation) at each timestep.
     site_name: str = "attachment_site"
+    # Site of the FT sensor, used only by the analytic-wrench fallback below
+    # (when the model has no FT force/torque sensors) to evaluate the body
+    # regressor about the same frame a real FT sensor would report in. This is
+    # a DIFFERENT site from `site_name` above.
+    ft_site_name: str = "ft_sensor"
     # Seconds to hold the initial target before recording so the arm settles
     # into its gravity-loaded equilibrium (PD-servo mode only).
     settle_time: float = 1.0
@@ -174,8 +180,10 @@ class TrajectoryPlayback:
             if use_ft_sensor:
                 wrench = ft_sensor.read(model, data)
             else:
-                # Fallback: analytic rigid-body regressor wrench ([torque; force]).
-                reg_sample = sample_body_regressor(model, data, cfg.body_name)
+                # Fallback: analytic rigid-body regressor wrench ([torque; force]),
+                # evaluated about the FT sensor site (cfg.ft_site_name), not the
+                # EE-pose site (cfg.site_name).
+                reg_sample = sample_body_regressor(model, data, cfg.body_name, cfg.ft_site_name)
                 wrench = compute_wrench_from_parameters(reg_sample.regressor, params)
 
             # Add measurement noise

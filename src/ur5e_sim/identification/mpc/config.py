@@ -5,8 +5,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from ur5e_sim.identification.constraints import JointLimits
-
-_UR5E_HOME = np.array([np.pi / 2, -np.pi / 2, np.pi / 2, -np.pi / 2, -np.pi / 2, 0.0])
+from ur5e_sim.identification.optimizer import UR5E_HOME_QPOS
 
 
 @dataclass
@@ -45,7 +44,7 @@ class MPCConfig:
 
     # Robot
     num_joints: int = 6
-    q0: np.ndarray | None = None  # initial position (None -> _UR5E_HOME)
+    q0: np.ndarray | None = None  # initial position (None -> UR5E_HOME_QPOS)
     joint_limits: JointLimits = field(default_factory=JointLimits)
 
     # MuJoCo identifiers — defaults match the direct-XML scene
@@ -64,7 +63,7 @@ class MPCConfig:
 
     def __post_init__(self) -> None:
         if self.q0 is None:
-            self.q0 = _UR5E_HOME.copy()
+            self.q0 = UR5E_HOME_QPOS.copy()
         if self.replan_period > self.horizon.duration:
             raise ValueError(
                 f"replan_period ({self.replan_period}) must be "

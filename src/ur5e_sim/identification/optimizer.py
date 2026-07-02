@@ -23,7 +23,7 @@ from ur5e_sim.identification.objective import (
 )
 from ur5e_sim.identification.workspace import EeVelocityConfig, WorkspaceConstraintConfig
 
-_UR5E_HOME = np.array([np.pi / 2, -np.pi / 2, np.pi / 2, -np.pi / 2, -np.pi / 2, 0.0])
+UR5E_HOME_QPOS = np.array([np.pi / 2, -np.pi / 2, np.pi / 2, -np.pi / 2, -np.pi / 2, 0.0])
 
 log = logging.getLogger(__name__)
 
@@ -56,11 +56,11 @@ class OptimizerConfig:
     with_ft_offset: bool = False
     ft_offset_column_scale: bool = True
     n_workers: int = 1  # Number of parallel worker processes (1 = sequential)
-    model_path: str | None = None  # Unused; workers build model via build_ur5e_model()
+    payload_xml: str | None = None  # Payload MJCF for worker model construction (mirrors CLI)
 
     def __post_init__(self) -> None:
         if self.q0 is None:
-            self.q0 = _UR5E_HOME.copy()
+            self.q0 = UR5E_HOME_QPOS.copy()
         if self.joint_limits is None:
             self.joint_limits = JointLimits()
 
@@ -365,10 +365,12 @@ def _run_single_restart(
     """Run a single restart in a worker process.
 
     Builds its own MjModel/MjData via MjSpec.attach() to ensure process safety.
+    Mirrors the CLI's model construction (payload_xml) so that body/site names
+    referenced by ``config`` (e.g. ``payload_workspace_config``) resolve correctly.
     """
     from ur5e_sim.core.model_builder import build_ur5e_model
 
-    model, data = build_ur5e_model()
+    model, data = build_ur5e_model(payload_xml=config.payload_xml)
 
     cache, constraints = _build_cache_and_constraints_static(config, model, data)
     fourier_bounds = _compute_fourier_bounds_static(config)

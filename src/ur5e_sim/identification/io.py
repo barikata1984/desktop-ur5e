@@ -1,13 +1,67 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 
 import numpy as np
 
-from ur5e_sim.identification.constraints import build_trajectory_from_params
+from ur5e_sim.identification.collision import CollisionConfig
+from ur5e_sim.identification.constraints import JointLimits, build_trajectory_from_params
 from ur5e_sim.identification.optimizer import OptimizationResult, OptimizerConfig
+from ur5e_sim.identification.workspace import EeVelocityConfig, WorkspaceConstraintConfig
 from ur5e_sim.trajectories.base import TrajectorySample
+
+
+def _joint_limits_to_dict(joint_limits: JointLimits) -> dict:
+    d = dataclasses.asdict(joint_limits)
+    for key in ("q_min", "q_max", "dq_max", "ddq_max"):
+        d[key] = np.asarray(d[key]).tolist()
+    return d
+
+
+def _joint_limits_from_dict(d: dict | None) -> JointLimits | None:
+    if d is None:
+        return None
+    return JointLimits(
+        q_min=np.asarray(d["q_min"], dtype=np.float64),
+        q_max=np.asarray(d["q_max"], dtype=np.float64),
+        dq_max=np.asarray(d["dq_max"], dtype=np.float64),
+        ddq_max=np.asarray(d["ddq_max"], dtype=np.float64),
+    )
+
+
+def _workspace_config_to_dict(cfg: WorkspaceConstraintConfig) -> dict:
+    d = dataclasses.asdict(cfg)
+    for key in ("box_lower", "box_upper"):
+        if d[key] is not None:
+            d[key] = np.asarray(d[key]).tolist()
+    return d
+
+
+def _workspace_config_from_dict(d: dict | None) -> WorkspaceConstraintConfig | None:
+    if d is None:
+        return None
+    box_lower = np.asarray(d["box_lower"], dtype=np.float64) if d["box_lower"] is not None else None
+    box_upper = np.asarray(d["box_upper"], dtype=np.float64) if d["box_upper"] is not None else None
+    return WorkspaceConstraintConfig(
+        max_displacement=d["max_displacement"],
+        box_lower=box_lower,
+        box_upper=box_upper,
+        safety_margin=d["safety_margin"],
+    )
+
+
+def _collision_config_from_dict(d: dict | None) -> CollisionConfig | None:
+    if d is None:
+        return None
+    return CollisionConfig(**d)
+
+
+def _ee_velocity_config_from_dict(d: dict | None) -> EeVelocityConfig | None:
+    if d is None:
+        return None
+    return EeVelocityConfig(**d)
 
 
 def save_optimization_result(
@@ -45,6 +99,36 @@ def save_optimization_result(
             "seed": cfg.seed,
             "body_name": cfg.body_name,
             "site_name": cfg.site_name,
+            "objective_type": cfg.objective_type,
+            "joint_limits": (
+                _joint_limits_to_dict(cfg.joint_limits) if cfg.joint_limits is not None else None
+            ),
+            "workspace_config": (
+                _workspace_config_to_dict(cfg.workspace_config)
+                if cfg.workspace_config is not None
+                else None
+            ),
+            "payload_workspace_config": (
+                _workspace_config_to_dict(cfg.payload_workspace_config)
+                if cfg.payload_workspace_config is not None
+                else None
+            ),
+            "collision_config": (
+                dataclasses.asdict(cfg.collision_config)
+                if cfg.collision_config is not None
+                else None
+            ),
+            "ee_velocity_config": (
+                dataclasses.asdict(cfg.ee_velocity_config)
+                if cfg.ee_velocity_config is not None
+                else None
+            ),
+            "enable_velocity_constraint": cfg.enable_velocity_constraint,
+            "enable_acceleration_constraint": cfg.enable_acceleration_constraint,
+            "use_fourier_bounds": cfg.use_fourier_bounds,
+            "with_ft_offset": cfg.with_ft_offset,
+            "ft_offset_column_scale": cfg.ft_offset_column_scale,
+            "n_workers": cfg.n_workers,
         },
     }
     path = Path(path)
@@ -74,6 +158,26 @@ def load_optimization_result(path: str | Path) -> OptimizationResult:
         seed=cfg_dict["seed"],
         body_name=cfg_dict["body_name"],
         site_name=cfg_dict["site_name"],
+        objective_type=cfg_dict.get("objective_type", OptimizerConfig.objective_type),
+        joint_limits=_joint_limits_from_dict(cfg_dict.get("joint_limits")),
+        workspace_config=_workspace_config_from_dict(cfg_dict.get("workspace_config")),
+        payload_workspace_config=_workspace_config_from_dict(
+            cfg_dict.get("payload_workspace_config")
+        ),
+        collision_config=_collision_config_from_dict(cfg_dict.get("collision_config")),
+        ee_velocity_config=_ee_velocity_config_from_dict(cfg_dict.get("ee_velocity_config")),
+        enable_velocity_constraint=cfg_dict.get(
+            "enable_velocity_constraint", OptimizerConfig.enable_velocity_constraint
+        ),
+        enable_acceleration_constraint=cfg_dict.get(
+            "enable_acceleration_constraint", OptimizerConfig.enable_acceleration_constraint
+        ),
+        use_fourier_bounds=cfg_dict.get("use_fourier_bounds", OptimizerConfig.use_fourier_bounds),
+        with_ft_offset=cfg_dict.get("with_ft_offset", OptimizerConfig.with_ft_offset),
+        ft_offset_column_scale=cfg_dict.get(
+            "ft_offset_column_scale", OptimizerConfig.ft_offset_column_scale
+        ),
+        n_workers=cfg_dict.get("n_workers", OptimizerConfig.n_workers),
     )
 
     x_opt = np.array(payload["x_opt"], dtype=np.float64)
