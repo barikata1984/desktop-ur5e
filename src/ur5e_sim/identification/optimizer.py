@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import mujoco
@@ -229,7 +230,7 @@ def _make_objective(
     cache: _TrajectoryCache,
     model: mujoco.MjModel,
     data: mujoco.MjData,
-) -> tuple[callable, list[float], list[float]]:
+) -> tuple[Callable[[np.ndarray], float], list[float], list[float]]:
     """Build the scipy objective and its latest obj/cond telemetry boxes."""
     use_d_optimal = cfg.objective_type == "d_optimal"
     column_scale = cfg.ft_offset_column_scale and cfg.with_ft_offset
@@ -294,6 +295,68 @@ def _final_condition_number(
     return float(result_fun)
 
 
+def _execute_restart(
+    x0: np.ndarray,
+    restart_index: int,
+    cfg: OptimizerConfig,
+    cache: _TrajectoryCache,
+    constraints: list[dict],
+    fourier_bounds: Bounds | None,
+    model: mujoco.MjModel,
+    data: mujoco.MjData,
+    iter_callback: Callable[[dict], None] | None = None,
+) -> _RestartResult:
+    """Run one restart (minimize + diagnostics), shared by sequential and parallel paths.
+
+    ``iter_callback`` is invoked with each per-iteration log entry (sequential uses it for
+    live wandb logging; the parallel worker passes None and replays logs after completion).
+    """
+    objective, latest_obj, latest_cond = _make_objective(cfg, cache, model, data)
+
+    iter_logs: list[dict[str, float]] = []
+    iter_count = [0]
+    t0 = time.perf_counter()
+
+    def _callback(xk: np.ndarray) -> None:
+        iter_count[0] += 1
+        entry = {
+            "iter/condition_number": latest_cond[0],
+            "iter/objective": latest_obj[0],
+            "iter/restart_index": restart_index,
+            "iter/iter_in_restart": iter_count[0],
+            "iter/wall_time": time.perf_counter() - t0,
+        }
+        iter_logs.append(entry)
+        if iter_callback is not None:
+            iter_callback(entry)
+
+    result = minimize(
+        objective,
+        x0,
+        method=cfg.optimizer_method,
+        bounds=fourier_bounds,
+        constraints=constraints,
+        options={"maxiter": cfg.max_iter_per_start, "ftol": cfg.ftol},
+        callback=_callback,
+    )
+    wall_time = time.perf_counter() - t0
+
+    cond = _final_condition_number(result.x, result.fun, cfg, cache, model, data)
+    named_margins = _evaluate_margins(result.x, constraints)
+
+    return _RestartResult(
+        restart_index=restart_index,
+        x=result.x.copy(),
+        fun=float(result.fun),
+        condition_number=cond,
+        n_func_evals=result.nfev,
+        n_iters=iter_count[0],
+        wall_time=wall_time,
+        named_margins=named_margins,
+        iter_logs=iter_logs,
+    )
+
+
 def _run_single_restart(
     config: OptimizerConfig,
     x0: np.ndarray,
@@ -310,53 +373,139 @@ def _run_single_restart(
     cache, constraints = _build_cache_and_constraints_static(config, model, data)
     fourier_bounds = _compute_fourier_bounds_static(config)
 
-    objective, _latest_obj, _latest_cond = _make_objective(config, cache, model, data)
+    return _execute_restart(
+        x0, restart_index, config, cache, constraints, fourier_bounds, model, data
+    )
 
-    # Track per-iteration metrics locally for batch logging
-    iter_logs: list[dict[str, float]] = []
-    iter_count = [0]
 
-    t0 = time.perf_counter()
+class _RestartAggregator:
+    """Shared bookkeeping for sequential and parallel restart loops."""
 
-    def _callback(xk: np.ndarray) -> None:
-        iter_count[0] += 1
-        iter_logs.append(
+    def __init__(
+        self,
+        cfg: OptimizerConfig,
+        early_stop: EarlyStopConfig,
+        wandb_config: WandbConfig | None,
+        wb_group: str,
+        wb_enabled: bool,
+    ) -> None:
+        self.cfg = cfg
+        self.early_stop = early_stop
+        self.wandb_config = wandb_config
+        self.wb_group = wb_group
+        self.wb_enabled = wb_enabled
+        self.use_d_optimal = cfg.objective_type == "d_optimal"
+
+        self.best_x: np.ndarray | None = None
+        self.best_cond = float("inf")
+        self.best_idx = 0
+        self.total_evals = 0
+        self.actual_restarts = 0
+        self.restart_summaries: list[dict] = []
+        self.patience_counter = 0
+        self._improved = False
+
+    def process(self, rr: _RestartResult, wb_run: object | None = None) -> None:
+        """Record one restart result: print, update best, append summary, log wandb."""
+        cfg = self.cfg
+        self.actual_restarts += 1
+        self.total_evals += rr.n_func_evals
+
+        if self.use_d_optimal:
+            print(
+                f"  start {rr.restart_index + 1}/{cfg.n_monte_carlo}: "
+                f"cond={rr.condition_number:.4f}  D-opt={rr.fun:.4f}  "
+                f"margin={rr.constraint_margin:.4f}  "
+                f"feasible={rr.feasible}  ({rr.wall_time:.1f}s)",
+                flush=True,
+            )
+        else:
+            print(
+                f"  start {rr.restart_index + 1}/{cfg.n_monte_carlo}: "
+                f"cond={rr.condition_number:.4f}  margin={rr.constraint_margin:.4f}  "
+                f"feasible={rr.feasible}  ({rr.wall_time:.1f}s)",
+                flush=True,
+            )
+
+        improved = rr.condition_number < self.best_cond
+        if improved:
+            self.best_cond = rr.condition_number
+            self.best_x = rr.x.copy()
+            self.best_idx = rr.restart_index
+        self._improved = improved
+
+        self.restart_summaries.append(
             {
-                "iter/condition_number": _latest_cond[0],
-                "iter/objective": _latest_obj[0],
-                "iter/restart_index": restart_index,
-                "iter/iter_in_restart": iter_count[0],
-                "iter/wall_time": time.perf_counter() - t0,
+                "restart_index": rr.restart_index,
+                "condition_number": rr.condition_number,
+                "feasible": rr.feasible,
+                "constraint_margin": rr.constraint_margin,
+                "named_margins": rr.named_margins,
+                "wall_time": rr.wall_time,
+                "n_func_evals": rr.n_func_evals,
+                "iter_logs": rr.iter_logs,
             }
         )
 
-    result = minimize(
-        objective,
-        x0,
-        method=config.optimizer_method,
-        bounds=fourier_bounds,
-        constraints=constraints,
-        options={"maxiter": config.max_iter_per_start, "ftol": config.ftol},
-        callback=_callback,
-    )
-    wall_time = time.perf_counter() - t0
+        if not self.wb_enabled:
+            return
 
-    # Evaluate condition number for reporting
-    cond = _final_condition_number(result.x, result.fun, config, cache, model, data)
+        # Sequential passes a live run (already logged per-iteration); parallel creates
+        # the run here and batch-replays the collected iteration logs.
+        if wb_run is None:
+            wb_run = ExcitationOptimizer._init_wandb_restart_run(
+                self.wandb_config, cfg, rr.restart_index, self.wb_group
+            )
+            if wb_run is None:
+                return
+            for step, iter_log in enumerate(rr.iter_logs, 1):
+                wb_run.log(
+                    {
+                        "condition_number": iter_log["iter/condition_number"],
+                        "objective": iter_log["iter/objective"],
+                        "wall_time": iter_log["iter/wall_time"],
+                    },
+                    step=step,
+                )
 
-    named_margins = _evaluate_margins(result.x, constraints)
+        restart_summary: dict = {
+            "condition_number": rr.condition_number,
+            "objective": rr.fun,
+            "constraint_margin_min": rr.constraint_margin,
+            "feasible": int(rr.feasible),
+            "n_func_evals": rr.n_func_evals,
+            "n_iters": rr.n_iters,
+            "wall_time_s": rr.wall_time,
+        }
+        for name, mval in rr.named_margins.items():
+            restart_summary[f"margin/{name}"] = mval
+        wb_run.summary.update(restart_summary)
+        wb_run.finish()
 
-    return _RestartResult(
-        restart_index=restart_index,
-        x=result.x.copy(),
-        fun=float(result.fun),
-        condition_number=cond,
-        n_func_evals=result.nfev,
-        n_iters=iter_count[0],
-        wall_time=wall_time,
-        named_margins=named_margins,
-        iter_logs=iter_logs,
-    )
+    def should_stop(self, rr: _RestartResult) -> str | None:
+        """Return an early-stop reason (and print it) or None. Call after ``process``."""
+        es = self.early_stop
+        if not es.enabled:
+            return None
+        if es.target_cond > 0 and rr.feasible and rr.condition_number <= es.target_cond:
+            print(
+                f"  Early stop: target cond {es.target_cond} reached "
+                f"(cond={rr.condition_number:.4f}, feasible=True)",
+                flush=True,
+            )
+            return "target_cond"
+        if self._improved and (self.best_cond < float("inf")):
+            self.patience_counter = 0
+        else:
+            self.patience_counter += 1
+        if self.patience_counter >= es.patience:
+            print(
+                f"  Early stop: no improvement for {es.patience} restarts "
+                f"(best={self.best_cond:.4f})",
+                flush=True,
+            )
+            return "patience"
+        return None
 
 
 class ExcitationOptimizer:
@@ -509,157 +658,58 @@ class ExcitationOptimizer:
         cache, constraints = self._build_cache_and_constraints()
         fourier_bounds = self._compute_fourier_bounds()
 
-        # --- wandb setup ---
         wb_enabled = wandb_config is not None and wandb_config.enabled
         wb_group = wandb_config.run_name or f"opt-{int(time.time())}" if wb_enabled else ""
-
-        # --- early stopping setup ---
         es = early_stop_config or EarlyStopConfig()
-        patience_counter = 0
-
-        use_d_optimal = cfg.objective_type == "d_optimal"
-        objective, _latest_obj, _latest_cond = _make_objective(cfg, cache, self.model, self.data)
-
-        best_x: np.ndarray | None = None
-        best_cond = float("inf")
-        best_idx = 0
-        total_evals = 0
-        restart_summaries: list[dict] = []
+        agg = _RestartAggregator(cfg, es, wandb_config, wb_group, wb_enabled)
 
         t0 = time.perf_counter()
 
-        actual_restarts = 0
         for i in range(cfg.n_monte_carlo):
-            x0 = all_x0[i]
-            iter_in_restart = [0]
-            iter_logs: list[dict[str, float]] = []
-            restart_t0 = time.perf_counter()
-
-            # Per-restart wandb run
+            # Per-restart wandb run: created before minimize so metrics log LIVE.
             wb_run = None
+            iter_callback: Callable[[dict], None] | None = None
             if wb_enabled:
                 wb_run = self._init_wandb_restart_run(wandb_config, cfg, i, wb_group)
-
-            def _callback(xk: np.ndarray) -> None:
-                iter_in_restart[0] += 1
-                log_entry = {
-                    "iter/condition_number": _latest_cond[0],
-                    "iter/objective": _latest_obj[0],
-                    "iter/wall_time": time.perf_counter() - restart_t0,
-                }
-                iter_logs.append(log_entry)
                 if wb_run is not None:
-                    wb_run.log(
-                        {
-                            "condition_number": _latest_cond[0],
-                            "objective": _latest_obj[0],
-                            "wall_time": time.perf_counter() - restart_t0,
-                        },
-                        step=iter_in_restart[0],
-                    )
 
-            result = minimize(
-                objective,
-                x0,
-                method=cfg.optimizer_method,
-                bounds=fourier_bounds,
-                constraints=constraints,
-                options={"maxiter": cfg.max_iter_per_start, "ftol": cfg.ftol},
-                callback=_callback,
+                    def iter_callback(entry: dict, _run: object = wb_run) -> None:
+                        _run.log(
+                            {
+                                "condition_number": entry["iter/condition_number"],
+                                "objective": entry["iter/objective"],
+                                "wall_time": entry["iter/wall_time"],
+                            },
+                            step=entry["iter/iter_in_restart"],
+                        )
+
+            rr = _execute_restart(
+                all_x0[i],
+                i,
+                cfg,
+                cache,
+                constraints,
+                fourier_bounds,
+                self.model,
+                self.data,
+                iter_callback=iter_callback,
             )
-            total_evals += result.nfev
-            actual_restarts += 1
-            restart_wall = time.perf_counter() - restart_t0
-            named_margins = _evaluate_margins(result.x, constraints)
-            margin = min(named_margins.values())
-            feasible = margin >= 0
-
-            cond = _final_condition_number(result.x, result.fun, cfg, cache, self.model, self.data)
-            obj_val = float(result.fun)
-
-            if use_d_optimal:
-                print(
-                    f"  start {i + 1}/{cfg.n_monte_carlo}: "
-                    f"cond={cond:.4f}  D-opt={obj_val:.4f}  margin={margin:.4f}  "
-                    f"feasible={feasible}  ({restart_wall:.1f}s)",
-                    flush=True,
-                )
-            else:
-                print(
-                    f"  start {i + 1}/{cfg.n_monte_carlo}: "
-                    f"cond={cond:.4f}  margin={margin:.4f}  "
-                    f"feasible={feasible}  ({restart_wall:.1f}s)",
-                    flush=True,
-                )
-
-            improved = cond < best_cond
-            if improved:
-                best_cond = cond
-                best_x = result.x.copy()
-                best_idx = i
-
-            restart_summaries.append(
-                {
-                    "restart_index": i,
-                    "condition_number": cond,
-                    "feasible": feasible,
-                    "constraint_margin": margin,
-                    "named_margins": named_margins,
-                    "wall_time": restart_wall,
-                    "n_func_evals": result.nfev,
-                    "iter_logs": iter_logs,
-                }
-            )
-
-            # Log restart summary to this restart's wandb run
-            if wb_run is not None:
-                restart_margins = named_margins
-                restart_summary: dict = {
-                    "condition_number": cond,
-                    "objective": obj_val,
-                    "constraint_margin_min": margin,
-                    "feasible": int(feasible),
-                    "n_func_evals": result.nfev,
-                    "n_iters": iter_in_restart[0],
-                    "wall_time_s": restart_wall,
-                }
-                for name, mval in restart_margins.items():
-                    restart_summary[f"margin/{name}"] = mval
-                wb_run.summary.update(restart_summary)
-                wb_run.finish()
-
-            if es.enabled:
-                if es.target_cond > 0 and feasible and cond <= es.target_cond:
-                    print(
-                        f"  Early stop: target cond {es.target_cond} reached "
-                        f"(cond={cond:.4f}, feasible=True)",
-                        flush=True,
-                    )
-                    break
-                if improved and (best_cond < float("inf")):
-                    patience_counter = 0
-                else:
-                    patience_counter += 1
-                if patience_counter >= es.patience:
-                    print(
-                        f"  Early stop: no improvement for {es.patience} restarts "
-                        f"(best={best_cond:.4f})",
-                        flush=True,
-                    )
-                    break
+            agg.process(rr, wb_run=wb_run)
+            if agg.should_stop(rr):
+                break
 
         wall_time = time.perf_counter() - t0
         opt_result = self._build_final_result(
-            best_x=best_x,
-            best_cond=best_cond,
-            best_idx=best_idx,
-            total_evals=total_evals,
-            actual_restarts=actual_restarts,
+            best_x=agg.best_x,
+            best_cond=agg.best_cond,
+            best_idx=agg.best_idx,
+            total_evals=agg.total_evals,
+            actual_restarts=agg.actual_restarts,
             wall_time=wall_time,
             cache=cache,
             constraints=constraints,
         )
-        opt_result.restart_history = restart_summaries
+        opt_result.restart_history = agg.restart_summaries
         if wb_enabled:
             self._log_wandb_summary(wandb_config, cfg, wb_group, opt_result)
         return opt_result
@@ -674,153 +724,45 @@ class ExcitationOptimizer:
         from concurrent.futures import ProcessPoolExecutor, as_completed
 
         cfg = self.config
-
         wb_enabled = wandb_config is not None and wandb_config.enabled
         wb_group = wandb_config.run_name or f"opt-{int(time.time())}" if wb_enabled else ""
-
         es = early_stop_config or EarlyStopConfig()
-        patience_counter = 0
-        use_d_optimal = cfg.objective_type == "d_optimal"
-
-        best_x: np.ndarray | None = None
-        best_cond = float("inf")
-        best_idx = 0
-        total_evals = 0
-        actual_restarts = 0
+        agg = _RestartAggregator(cfg, es, wandb_config, wb_group, wb_enabled)
 
         t0 = time.perf_counter()
-
         print(f"  Parallel mode: {cfg.n_workers} workers", flush=True)
 
         # Submit one future per restart for fine-grained early stopping
         futures = {}
         with ProcessPoolExecutor(max_workers=cfg.n_workers) as executor:
             for i in range(cfg.n_monte_carlo):
-                future = executor.submit(
-                    _run_single_restart,
-                    cfg,
-                    all_x0[i],
-                    i,
-                )
+                future = executor.submit(_run_single_restart, cfg, all_x0[i], i)
                 futures[future] = i
 
-            restart_summaries: list[dict] = []
-            stopped_early = False
             for future in as_completed(futures):
                 rr = future.result()
-                actual_restarts += 1
-                total_evals += rr.n_func_evals
-
-                if use_d_optimal:
-                    print(
-                        f"  start {rr.restart_index + 1}/{cfg.n_monte_carlo}: "
-                        f"cond={rr.condition_number:.4f}  D-opt={rr.fun:.4f}  "
-                        f"margin={rr.constraint_margin:.4f}  "
-                        f"feasible={rr.feasible}  ({rr.wall_time:.1f}s)",
-                        flush=True,
-                    )
-                else:
-                    print(
-                        f"  start {rr.restart_index + 1}/{cfg.n_monte_carlo}: "
-                        f"cond={rr.condition_number:.4f}  margin={rr.constraint_margin:.4f}  "
-                        f"feasible={rr.feasible}  ({rr.wall_time:.1f}s)",
-                        flush=True,
-                    )
-
-                improved = rr.condition_number < best_cond
-                if improved:
-                    best_cond = rr.condition_number
-                    best_x = rr.x.copy()
-                    best_idx = rr.restart_index
-
-                restart_summaries.append(
-                    {
-                        "restart_index": rr.restart_index,
-                        "condition_number": rr.condition_number,
-                        "feasible": rr.feasible,
-                        "constraint_margin": rr.constraint_margin,
-                        "named_margins": rr.named_margins,
-                        "wall_time": rr.wall_time,
-                        "n_func_evals": rr.n_func_evals,
-                        "iter_logs": rr.iter_logs,
-                    }
-                )
-
-                # Log this restart as an independent wandb run
-                if wb_enabled:
-                    wb_run = self._init_wandb_restart_run(
-                        wandb_config,
-                        cfg,
-                        rr.restart_index,
-                        wb_group,
-                    )
-                    if wb_run is not None:
-                        for step, iter_log in enumerate(rr.iter_logs, 1):
-                            wb_run.log(
-                                {
-                                    "condition_number": iter_log["iter/condition_number"],
-                                    "objective": iter_log["iter/objective"],
-                                    "wall_time": iter_log["iter/wall_time"],
-                                },
-                                step=step,
-                            )
-                        restart_summary: dict = {
-                            "condition_number": rr.condition_number,
-                            "objective": rr.fun,
-                            "constraint_margin_min": rr.constraint_margin,
-                            "feasible": int(rr.feasible),
-                            "n_func_evals": rr.n_func_evals,
-                            "n_iters": rr.n_iters,
-                            "wall_time_s": rr.wall_time,
-                        }
-                        for name, mval in rr.named_margins.items():
-                            restart_summary[f"margin/{name}"] = mval
-                        wb_run.summary.update(restart_summary)
-                        wb_run.finish()
-
-                # Early stopping check
-                if es.enabled and not stopped_early:
-                    if es.target_cond > 0 and rr.feasible and rr.condition_number <= es.target_cond:
-                        print(
-                            f"  Early stop: target cond {es.target_cond} reached "
-                            f"(cond={rr.condition_number:.4f}, feasible=True)",
-                            flush=True,
-                        )
-                        stopped_early = True
-                    elif improved and (best_cond < float("inf")):
-                        patience_counter = 0
-                    else:
-                        patience_counter += 1
-
-                    if not stopped_early and patience_counter >= es.patience:
-                        print(
-                            f"  Early stop: no improvement for {es.patience} restarts "
-                            f"(best={best_cond:.4f})",
-                            flush=True,
-                        )
-                        stopped_early = True
-
-                    if stopped_early:
-                        # Cancel remaining futures (best-effort)
-                        for f in futures:
-                            f.cancel()
-                        break
+                agg.process(rr)
+                if agg.should_stop(rr):
+                    # Cancel remaining futures (best-effort); break avoids CancelledError.
+                    for f in futures:
+                        f.cancel()
+                    break
 
         wall_time = time.perf_counter() - t0
 
         # Build final result using local cache/constraints for diagnostics
         cache, constraints = self._build_cache_and_constraints()
         opt_result = self._build_final_result(
-            best_x=best_x,
-            best_cond=best_cond,
-            best_idx=best_idx,
-            total_evals=total_evals,
-            actual_restarts=actual_restarts,
+            best_x=agg.best_x,
+            best_cond=agg.best_cond,
+            best_idx=agg.best_idx,
+            total_evals=agg.total_evals,
+            actual_restarts=agg.actual_restarts,
             wall_time=wall_time,
             cache=cache,
             constraints=constraints,
         )
-        opt_result.restart_history = restart_summaries
+        opt_result.restart_history = agg.restart_summaries
         if wb_enabled:
             self._log_wandb_summary(wandb_config, cfg, wb_group, opt_result)
         return opt_result
