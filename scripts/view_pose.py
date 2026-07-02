@@ -11,6 +11,7 @@ import mujoco.viewer
 import numpy as np
 
 from ur5e_sim.core.ik import GRIPPER_CLOSED_CTRL, solve_ik
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.core.model_builder import build_ur5e_model
 from ur5e_sim.pushing.keyframe import close_gripper_sim
 from ur5e_sim.pushing.kinematics import R_TOOL0_DES
@@ -55,6 +56,7 @@ def draw_frame(viewer: mujoco.viewer.Handle, pos: np.ndarray, mat: np.ndarray) -
 
 def main() -> None:
     m, d = build_ur5e_model(payload_xml=None)
+    layout = DofLayout.from_model(m)
 
     tip_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "gripper_pinch")
     ori_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "attachment_site")
@@ -153,10 +155,10 @@ def main() -> None:
 
     # Set initial pose
     mujoco.mj_resetData(m, d)
-    d.qpos[:6] = q_trajectory[0]
-    d.qpos[6:14] = gripper_qpos
-    d.ctrl[:6] = q_trajectory[0]
-    d.ctrl[6] = GRIPPER_CLOSED_CTRL
+    d.qpos[layout.arm_qpos] = q_trajectory[0]
+    d.qpos[layout.gripper_qpos] = gripper_qpos
+    layout.set_arm_ctrl(d, q_trajectory[0])
+    layout.hold_gripper_ctrl(d, GRIPPER_CLOSED_CTRL)
     mujoco.mj_forward(m, d)
 
     viewer_fps = 30
@@ -165,10 +167,10 @@ def main() -> None:
     with mujoco.viewer.launch_passive(m, d) as viewer:
         idx = 0
         while viewer.is_running():
-            d.qpos[:6] = q_trajectory[idx]
-            d.qpos[6:14] = gripper_qpos
-            d.ctrl[:6] = q_trajectory[idx]
-            d.ctrl[6] = GRIPPER_CLOSED_CTRL
+            d.qpos[layout.arm_qpos] = q_trajectory[idx]
+            d.qpos[layout.gripper_qpos] = gripper_qpos
+            layout.set_arm_ctrl(d, q_trajectory[idx])
+            layout.hold_gripper_ctrl(d, GRIPPER_CLOSED_CTRL)
             mujoco.mj_forward(m, d)
 
             tip_pos = d.site_xpos[tip_id].copy()

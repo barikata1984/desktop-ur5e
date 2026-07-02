@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import mujoco
 import numpy as np
 
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.core.sensors import FTSensor
 from ur5e_sim.core.types import get_site_frame
 from ur5e_sim.trajectories.base import TrajectorySample
@@ -62,6 +63,7 @@ class TrajectoryPlayback:
         self._model = model
         self._data = data
         self._config = config
+        self._layout = DofLayout.from_model(model)
 
     def execute(
         self,
@@ -100,17 +102,14 @@ class TrajectoryPlayback:
 
         # Pad trajectory to model DOFs when it covers only a subset (e.g. 6 arm
         # joints on a 14-DOF model with gripper). Extra DOFs are held at zero.
-        nq, nv, nu = model.nq, model.nv, model.nu
+        layout = self._layout
+        nq, nv = model.nq, model.nv
         if n_joints < nq:
-            pad_q = nq - n_joints
-            pad_v = nv - n_joints
             trajectory = TrajectorySample(
                 time=trajectory.time,
-                position=np.hstack([trajectory.position, np.zeros((len(trajectory.time), pad_q))]),
-                velocity=np.hstack([trajectory.velocity, np.zeros((len(trajectory.time), pad_v))]),
-                acceleration=np.hstack(
-                    [trajectory.acceleration, np.zeros((len(trajectory.time), pad_v))]
-                ),
+                position=layout.to_full_qpos(trajectory.position),
+                velocity=layout.to_full_qvel(trajectory.velocity),
+                acceleration=layout.to_full_qvel(trajectory.acceleration),
             )
 
         buffer = DataBuffer()
@@ -132,7 +131,7 @@ class TrajectoryPlayback:
         # carry a large acceleration spike unrelated to the desired trajectory.
         if cfg.use_pd_control and cfg.settle_time > 0.0:
             q_start = trajectory.position[0]
-            data.ctrl[:] = trajectory.position[0][:nu]
+            layout.set_arm_ctrl(data, layout.arm(q_start))
             n_settle = max(1, round(cfg.settle_time / model.opt.timestep))
             for _ in range(n_settle):
                 mujoco.mj_step(model, data)
@@ -146,7 +145,7 @@ class TrajectoryPlayback:
             if cfg.use_pd_control:
                 # Servo-tracking mode: feed the target angle to the built-in
                 # position-velocity servos and integrate the full trajectory dt.
-                data.ctrl[:] = q_des[:nu]
+                layout.set_arm_ctrl(data, layout.arm(q_des))
                 for _ in range(n_substeps):
                     mujoco.mj_step(model, data)
 

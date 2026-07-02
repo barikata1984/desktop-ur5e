@@ -6,11 +6,15 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.core.model_builder import build_ur5e_model
 
 # Identification scene: the box payload attached to the end effector, assembled
 # programmatically via build_ur5e_model() (the canonical construction path).
 PAYLOAD_XML = "scenes/objects/payload_box.xml"
+
+# DOF layout of the identification scene, used by the arm<->full padding helpers below.
+_LAYOUT = DofLayout.from_model(build_ur5e_model(payload_xml=PAYLOAD_XML)[0])
 
 
 def load_identification_scene() -> SimpleNamespace:
@@ -35,24 +39,13 @@ Q0_ARM = np.array([np.pi / 2, -np.pi / 2, np.pi / 2, -np.pi / 2, -np.pi / 2, 0.0
 
 def arm_to_full_qpos(q_arm: np.ndarray, nq: int = NUM_TOTAL_JOINTS) -> np.ndarray:
     """Pad a 6-element arm qpos to full model qpos (zeros for gripper joints)."""
-    if q_arm.ndim == 1:
-        full = np.zeros(nq)
-        full[:NUM_ARM_JOINTS] = q_arm
-        return full
-    # 2D: (N, 6) -> (N, nq)
-    n = q_arm.shape[0]
-    full = np.zeros((n, nq))
-    full[:, :NUM_ARM_JOINTS] = q_arm
-    return full
+    if nq != _LAYOUT.nq:
+        raise ValueError(f"nq={nq} does not match identification scene nq={_LAYOUT.nq}")
+    return _LAYOUT.to_full_qpos(q_arm)
 
 
 def arm_to_full_qvel(dq_arm: np.ndarray, nv: int = NUM_TOTAL_JOINTS) -> np.ndarray:
     """Pad a 6-element arm qvel to full model qvel (zeros for gripper joints)."""
-    if dq_arm.ndim == 1:
-        full = np.zeros(nv)
-        full[:NUM_ARM_JOINTS] = dq_arm
-        return full
-    n = dq_arm.shape[0]
-    full = np.zeros((n, nv))
-    full[:, :NUM_ARM_JOINTS] = dq_arm
-    return full
+    if nv != _LAYOUT.nv:
+        raise ValueError(f"nv={nv} does not match identification scene nv={_LAYOUT.nv}")
+    return _LAYOUT.to_full_qvel(dq_arm)

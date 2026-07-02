@@ -4,6 +4,7 @@ import mujoco
 import numpy as np
 
 from ur5e_sim.core.env import get_named_object_id
+from ur5e_sim.core.layout import DofLayout
 
 from .sampling import sample_body_kinematics, set_model_state, trajectory_subsample_indices
 from .types import BodyKinematics, InertialParameters, RegressorSample
@@ -229,16 +230,10 @@ def compute_stacked_body_regressor(
     # Pad trajectory columns when model has more DoFs than the trajectory
     # (e.g. 6-joint arm trajectory on a 14-DoF model with gripper joints).
     if q_array.ndim == 2 and q_array.shape[1] < model.nq:
-        n_steps = q_array.shape[0]
-        q_pad = np.zeros((n_steps, model.nq), dtype=np.float64)
-        q_pad[:, : q_array.shape[1]] = q_array
-        q_array = q_pad
-        dq_pad = np.zeros((n_steps, model.nv), dtype=np.float64)
-        dq_pad[:, : dq_array.shape[1]] = dq_array
-        dq_array = dq_pad
-        ddq_pad = np.zeros((n_steps, model.nv), dtype=np.float64)
-        ddq_pad[:, : ddq_array.shape[1]] = ddq_array
-        ddq_array = ddq_pad
+        layout = DofLayout.from_model(model)
+        q_array = layout.to_full_qpos(q_array)
+        dq_array = layout.to_full_qvel(dq_array)
+        ddq_array = layout.to_full_qvel(ddq_array)
 
     if q_array.ndim != 2 or q_array.shape[1] != model.nq:
         raise ValueError(f"q must have shape (N, {model.nq})")

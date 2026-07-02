@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import mujoco
 import numpy as np
 
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.identification.estimators.rtls import RecursiveTotalLeastSquares, RTLSConfig
 from ur5e_sim.identification.estimators.types import EstimationResult
 from ur5e_sim.identification.execution import PlaybackConfig, TrajectoryPlayback
@@ -83,6 +84,7 @@ class MPCLoop:
         self._config = config
         self._model = model
         self._data = data
+        self._layout = DofLayout.from_model(model)
         self._planner = ExcitationPlanner(config, model, data)
         self._rtls = RecursiveTotalLeastSquares(RTLSConfig(n_params=config.n_inertial_params))
         self._playback = TrajectoryPlayback(
@@ -157,10 +159,9 @@ class MPCLoop:
                 self._rtls.update(W_new, y_new)
             estimation = self._rtls.get_current_estimate()
 
-            nj = cfg.num_joints
-            q_start = q_meas[0, :nj].copy()
-            q_current = q_meas[-1, :nj].copy()
-            dq_current = dq_meas[-1, :nj].copy()
+            q_start = self._layout.arm(q_meas[0]).copy()
+            q_current = self._layout.arm(q_meas[-1]).copy()
+            dq_current = self._layout.arm(dq_meas[-1]).copy()
 
             print(
                 f"  -> cond={cond_accumulated:.2f}  "

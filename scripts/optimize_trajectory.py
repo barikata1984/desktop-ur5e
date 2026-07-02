@@ -14,6 +14,7 @@ import tyro
 import yaml
 
 from ur5e_sim.core.env import get_workspace_bounds
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.core.model_builder import build_ur5e_model
 from ur5e_sim.identification.collision import CollisionConfig
 from ur5e_sim.identification.io import (
@@ -126,7 +127,8 @@ def main() -> None:
     config = _build_config()
 
     model, data = build_ur5e_model(payload_xml=_PAYLOAD_XML)
-    q0 = np.array(data.qpos[:6], dtype=np.float64)
+    layout = DofLayout.from_model(model)
+    q0 = layout.arm(data.qpos).copy()
 
     workspace_config: WorkspaceConstraintConfig | None = None
     if config.max_displacement > 0:

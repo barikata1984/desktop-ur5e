@@ -25,6 +25,7 @@ from ur5e_sim.core.ik import (
     get_jacobian6,
     orientation_error,
 )
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.core.renderer import FrameRenderer
 from ur5e_sim.core.sensors import ContactSensor
 from ur5e_sim.pushing.config import SimConfig
@@ -50,8 +51,10 @@ def move_tip_to(
     renderer: FrameRenderer | None = None,
     max_steps: int = 300,
     tol: float = 0.001,
+    layout: DofLayout | None = None,
 ) -> np.ndarray:
     """Iterative 6-DOF IK move: tip to target_pos while holding tool0 vertical."""
+    layout = layout or DofLayout.from_model(m)
     substeps = int(cfg.mpc.dt / m.opt.timestep)
     tool0_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, "attachment_site")
     if tool0_site_id is None:
@@ -68,11 +71,11 @@ def move_tip_to(
         if pn > cfg.robot.ik_max_step:
             pstep *= cfg.robot.ik_max_step / pn
         ostep = np.clip(oerr * ORI_GAIN, -0.1, 0.1)
-        J = get_jacobian6(m, d, tip_site_id, tool0_site_id)
+        J = get_jacobian6(m, d, tip_site_id, tool0_site_id, layout)
         dq = damped_pinv(J, cfg.robot.damping) @ np.concatenate([pstep, ostep])
         ctrl = ctrl + dq
-        d.ctrl[:6] = ctrl
-        d.ctrl[6] = GRIPPER_CLOSED_CTRL  # keep gripper closed
+        layout.set_arm_ctrl(d, ctrl)
+        layout.hold_gripper_ctrl(d, GRIPPER_CLOSED_CTRL)  # keep gripper closed
         for __ in range(substeps):
             mujoco.mj_step(m, d)
         if renderer is not None:
@@ -90,6 +93,7 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
     dump_config(cfg, trial_dir)
 
     m, d = build_push_model()
+    layout = DofLayout.from_model(m)
 
     tip_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, "gripper_pinch")
     if tip_site_id is None:
@@ -123,8 +127,8 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
     print(f"Initial pusher tip (kinematic): {tip_init}")
     print(f"Initial slider pos: {slider_pos_init}, theta: {np.degrees(slider_theta_init):.2f} deg")
 
-    ctrl = d.ctrl[:6].copy()
-    d.ctrl[6] = GRIPPER_CLOSED_CTRL
+    ctrl = d.ctrl[layout.arm_ctrl].copy()
+    layout.hold_gripper_ctrl(d, GRIPPER_CLOSED_CTRL)
     substeps = int(cfg.mpc.dt / m.opt.timestep)
 
     renderer = FrameRenderer(m, pics_dir, cfg.render.width, cfg.render.height, cfg.render.camera)
@@ -144,7 +148,9 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
         [slider_pos_init[0], slider_face_y - PINCH_TO_PAD_FRONT - 0.0005, slider_pos_init[2]]
     )
     print(f"\n--- Phase 0: Approach (tip -> {approach_target}) ---")
-    ctrl = move_tip_to(m, d, tip_site_id, approach_target, ctrl, cfg, renderer, max_steps=500)
+    ctrl = move_tip_to(
+        m, d, tip_site_id, approach_target, ctrl, cfg, renderer, max_steps=500, layout=layout
+    )
     mujoco.mj_forward(m, d)
     print(f"After approach: tip={d.site_xpos[tip_site_id].copy()}, time={d.time:.2f}s")
 
@@ -190,8 +196,8 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
         log.pusher_z.append(tip_pos[2])
         log.pusher_body_px.append(pusher_body[0])
         log.pusher_body_py.append(pusher_body[1])
-        log.joint_pos.append(d.qpos[:6].tolist())
-        log.joint_ctrl.append(d.ctrl[:6].tolist())
+        log.joint_pos.append(layout.arm(d.qpos).tolist())
+        log.joint_ctrl.append(d.ctrl[layout.arm_ctrl].tolist())
         log.contact_count.append(d.ncon)
         log.contact_forces.append(contact_force.tolist())
 
@@ -250,8 +256,8 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
         J = get_jacobian6(m, d, tip_site_id, tool0_site_id)
         dq = damped_pinv(J, cfg.robot.damping) @ (v6 * cfg.mpc.dt)
         ctrl = ctrl + dq
-        d.ctrl[:6] = ctrl
-        d.ctrl[6] = GRIPPER_CLOSED_CTRL  # keep gripper closed
+        layout.set_arm_ctrl(d, ctrl)
+        layout.hold_gripper_ctrl(d, GRIPPER_CLOSED_CTRL)  # keep gripper closed
 
         for _ in range(substeps):
             mujoco.mj_step(m, d)

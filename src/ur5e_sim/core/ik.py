@@ -3,6 +3,8 @@ from __future__ import annotations
 import mujoco
 import numpy as np
 
+from ur5e_sim.core.layout import DofLayout
+
 ORI_GAIN = 2.0
 GRIPPER_CLOSED_CTRL = 255
 
@@ -13,11 +15,14 @@ def damped_pinv(J: np.ndarray, damping: float) -> np.ndarray:
     return J.T @ np.linalg.inv(JJT + damping**2 * np.eye(JJT.shape[0]))
 
 
-def get_jacobian(m: mujoco.MjModel, d: mujoco.MjData, site_id: int) -> np.ndarray:
+def get_jacobian(
+    m: mujoco.MjModel, d: mujoco.MjData, site_id: int, layout: DofLayout | None = None
+) -> np.ndarray:
     """3xN_arm translational Jacobian of a site (arm joint columns only)."""
+    layout = layout or DofLayout.from_model(m)
     jacp = np.zeros((3, m.nv))
     mujoco.mj_jacSite(m, d, jacp, None, site_id)
-    return jacp[:, :6]
+    return jacp[:, layout.arm_dof]
 
 
 def orientation_error(
@@ -33,13 +38,20 @@ def orientation_error(
     return quat[1:] / n * 2 * np.arctan2(n, quat[0]) if n > 1e-9 else np.zeros(3)
 
 
-def get_jacobian6(m: mujoco.MjModel, d: mujoco.MjData, pos_site: int, ori_site: int) -> np.ndarray:
+def get_jacobian6(
+    m: mujoco.MjModel,
+    d: mujoco.MjData,
+    pos_site: int,
+    ori_site: int,
+    layout: DofLayout | None = None,
+) -> np.ndarray:
     """Stacked 6x6 arm Jacobian: translation of pos_site + rotation of ori_site."""
+    layout = layout or DofLayout.from_model(m)
     jacp = np.zeros((3, m.nv))
     jacr = np.zeros((3, m.nv))
     mujoco.mj_jacSite(m, d, jacp, None, pos_site)
     mujoco.mj_jacSite(m, d, None, jacr, ori_site)
-    return np.vstack([jacp[:, :6], jacr[:, :6]])
+    return np.vstack([jacp[:, layout.arm_dof], jacr[:, layout.arm_dof]])
 
 
 def solve_ik(
@@ -58,15 +70,18 @@ def solve_ik(
     max_step: float = 0.05,
     damping: float = 1e-3,
     verbose: bool = False,
+    layout: DofLayout | None = None,
 ) -> tuple[np.ndarray, float, float]:
     """6-DOF damped-pseudoinverse IK: position + orientation control.
 
     Returns (arm_qpos, pos_err, ori_err).
     """
-    d.qpos[:6] = q_init.copy()
-    d.qpos[6:14] = gripper_qpos.copy()
-    d.ctrl[:6] = q_init.copy()
-    d.ctrl[6] = GRIPPER_CLOSED_CTRL
+    layout = layout or DofLayout.from_model(m)
+    d.qpos[layout.arm_qpos] = q_init.copy()
+    if layout.gripper_qpos is not None:
+        d.qpos[layout.gripper_qpos] = gripper_qpos.copy()
+    layout.set_arm_ctrl(d, q_init.copy())
+    layout.hold_gripper_ctrl(d, GRIPPER_CLOSED_CTRL)
     mujoco.mj_forward(m, d)
 
     for i in range(max_iter):
@@ -86,15 +101,16 @@ def solve_ik(
             pstep *= max_step / pn
         ostep = np.clip(oerr * gain, -0.1, 0.1)
 
-        J = get_jacobian6(m, d, tip_site_id, ori_site_id)
+        J = get_jacobian6(m, d, tip_site_id, ori_site_id, layout)
         dq = damped_pinv(J, damping) @ np.concatenate([pstep, ostep])
-        d.qpos[:6] += dq
-        d.qpos[6:14] = gripper_qpos.copy()
-        d.ctrl[:6] = d.qpos[:6].copy()
-        d.ctrl[6] = GRIPPER_CLOSED_CTRL
+        d.qpos[layout.arm_qpos] += dq
+        if layout.gripper_qpos is not None:
+            d.qpos[layout.gripper_qpos] = gripper_qpos.copy()
+        layout.set_arm_ctrl(d, d.qpos[layout.arm_qpos].copy())
+        layout.hold_gripper_ctrl(d, GRIPPER_CLOSED_CTRL)
         mujoco.mj_forward(m, d)
 
     tip_final = d.site_xpos[tip_site_id].copy()
     pos_err = np.linalg.norm(target_pos - tip_final)
     ori_err = np.linalg.norm(orientation_error(d, ori_site_id, R_des))
-    return d.qpos[:6].copy(), pos_err, ori_err
+    return d.qpos[layout.arm_qpos].copy(), pos_err, ori_err

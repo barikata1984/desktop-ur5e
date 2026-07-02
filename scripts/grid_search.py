@@ -21,6 +21,7 @@ from pathlib import Path
 import numpy as np
 
 from ur5e_sim.core.env import get_workspace_bounds
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.core.model_builder import build_ur5e_model
 from ur5e_sim.identification.collision import CollisionConfig
 from ur5e_sim.identification.constraints import JointLimits
@@ -100,7 +101,8 @@ def _run_condition_worker(label: str, cond_dict: dict, output_dir: str) -> dict:
     traj_path = out / "traj.json"
 
     model, data = build_ur5e_model(payload_xml="scenes/objects/payload_flat.xml")
-    q0 = np.array(data.qpos[:6], dtype=np.float64)
+    layout = DofLayout.from_model(model)
+    q0 = layout.arm(data.qpos).copy()
     ws_lower, ws_upper = get_workspace_bounds(model, data)
     ws_center = (ws_lower + ws_upper) / 2
     z_half = (ws_upper[2] - ws_lower[2]) / 2

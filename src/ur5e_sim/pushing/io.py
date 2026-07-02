@@ -66,6 +66,8 @@ class Log:
             vn=np.array(self.vn),
             vt=np.array(self.vt),
             target_y=np.array(self.target_y),
+            # Width 6 = n_arm (see core.layout.DofLayout); Log has no model reference to
+            # derive it from, so it stays a literal fallback for the empty-log case.
             joint_pos=np.array(self.joint_pos) if self.joint_pos else np.empty((0, 6)),
             joint_ctrl=np.array(self.joint_ctrl) if self.joint_ctrl else np.empty((0, 6)),
             contact_count=np.array(self.contact_count),

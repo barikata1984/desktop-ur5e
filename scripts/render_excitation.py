@@ -10,6 +10,7 @@ import mujoco
 import numpy as np
 import tyro
 
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.core.model_builder import build_ur5e_model
 from ur5e_sim.core.renderer import add_ee_frame_overlay
 from ur5e_sim.identification.io import load_optimization_result, result_to_trajectory
@@ -94,7 +95,10 @@ def main() -> None:
     )
 
     frames: list[np.ndarray] = []
+    layout = DofLayout.from_model(model)
     n_joints = trajectory.position.shape[1]
+    if n_joints != layout.n_arm:
+        raise ValueError(f"Trajectory has {n_joints} joints, expected {layout.n_arm} (arm width)")
     frame_dirs: dict[str, Path] = {}
 
     if config.save_frames:
@@ -112,7 +116,7 @@ def main() -> None:
 
     for frame_idx, traj_idx in enumerate(traj_indices):
         q = trajectory.position[traj_idx]
-        data.qpos[:n_joints] = q
+        data.qpos[layout.arm_qpos] = q
         mujoco.mj_forward(model, data)
 
         if config.multi_camera:

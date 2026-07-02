@@ -7,16 +7,8 @@ import mujoco
 import numpy as np
 
 from ur5e_sim.core.env import get_named_object_id
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.identification.constraints import _TrajectoryCache
-
-
-def _pad_qpos(q_row: np.ndarray, nq: int) -> np.ndarray:
-    """Zero-pad a joint-space vector to match model nq if shorter."""
-    if q_row.shape[-1] >= nq:
-        return q_row
-    padded = np.zeros(nq, dtype=np.float64)
-    padded[: q_row.shape[-1]] = q_row
-    return padded
 
 
 @dataclass(frozen=True)
@@ -45,11 +37,16 @@ def _evaluate_workspace_positions(
     if site_id is None:
         raise ValueError(f"Unknown site: {site_name}")
 
+    layout = DofLayout.from_model(model)
+    q_full = (
+        layout.to_full_qpos(q_trajectory) if q_trajectory.shape[-1] < model.nq else q_trajectory
+    )
+
     n_steps = q_trajectory.shape[0]
     positions = np.zeros((n_steps, 3), dtype=np.float64)
 
     for i in range(n_steps):
-        data.qpos[:] = _pad_qpos(q_trajectory[i], model.nq)
+        data.qpos[:] = q_full[i]
         mujoco.mj_kinematics(model, data)
         positions[i] = data.site_xpos[site_id].copy()
 
@@ -202,11 +199,16 @@ def _evaluate_payload_surface_points(
     local_points = _box_surface_points(half_extents, geom_offset)  # (26, 3)
     n_points = local_points.shape[0]
 
+    layout = DofLayout.from_model(model)
+    q_full = (
+        layout.to_full_qpos(q_trajectory) if q_trajectory.shape[-1] < model.nq else q_trajectory
+    )
+
     n_steps = q_trajectory.shape[0]
     world_points = np.zeros((n_steps, n_points, 3), dtype=np.float64)
 
     for i in range(n_steps):
-        data.qpos[:] = _pad_qpos(q_trajectory[i], model.nq)
+        data.qpos[:] = q_full[i]
         mujoco.mj_kinematics(model, data)
         body_pos = data.xpos[geom_body_id]
         body_rot = data.xmat[geom_body_id].reshape(3, 3)
@@ -274,16 +276,22 @@ def _evaluate_ee_linear_velocity(
         raise ValueError(f"Unknown site: {site_name}")
 
     nv = model.nv
+    layout = DofLayout.from_model(model)
+    q_full = (
+        layout.to_full_qpos(q_trajectory) if q_trajectory.shape[-1] < model.nq else q_trajectory
+    )
+    dq_full = layout.to_full_qvel(dq_trajectory) if dq_trajectory.shape[-1] < nv else dq_trajectory
+
     n_steps = q_trajectory.shape[0]
     speeds = np.zeros(n_steps, dtype=np.float64)
     jacp = np.zeros((3, nv), dtype=np.float64)
 
     for i in range(n_steps):
-        data.qpos[:] = _pad_qpos(q_trajectory[i], model.nq)
+        data.qpos[:] = q_full[i]
         mujoco.mj_kinematics(model, data)
         jacp[:] = 0.0
         mujoco.mj_jacSite(model, data, jacp, None, site_id)
-        linear_vel = jacp @ _pad_qpos(dq_trajectory[i], nv)
+        linear_vel = jacp @ dq_full[i]
         speeds[i] = np.linalg.norm(linear_vel)
 
     return speeds

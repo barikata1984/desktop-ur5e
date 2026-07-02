@@ -23,6 +23,7 @@ import mujoco
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.pushing.scene import build_push_model
 
 PANE_W, PANE_H = 480, 360
@@ -53,9 +54,19 @@ def apply_antiglare(m: mujoco.MjModel) -> None:
 def render_grid_video(trial_dir: Path) -> Path:
     m, d = build_push_model()
     apply_antiglare(m)
+    layout = DofLayout.from_model(m)
+
+    # Slider is a freejoint (see scenes/objects/slider.xml): 3 pos + 4 quat qpos entries,
+    # starting at its own jnt_qposadr (not fixed literals).
+    slider_joint_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, "slider_joint")
+    if slider_joint_id < 0:
+        raise ValueError("Joint 'slider_joint' not found in model")
+    slider_qpos_addr = int(m.jnt_qposadr[slider_joint_id])
+    slider_pos_qpos = slice(slider_qpos_addr, slider_qpos_addr + 3)
+    slider_quat_qpos = slice(slider_qpos_addr + 3, slider_qpos_addr + 7)
 
     key = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_KEY, "ready")
-    grip_closed = m.key_qpos[key][6:14].copy()
+    grip_closed = m.key_qpos[key][layout.gripper_qpos].copy()
 
     z = np.load(trial_dir / "data.npz")
     jp, sx, sy, squat, t = (
@@ -88,10 +99,10 @@ def render_grid_video(trial_dir: Path) -> Path:
         return Image.fromarray(renderer.render())
 
     for i in range(n):
-        d.qpos[:6] = jp[i]
-        d.qpos[6:14] = grip_closed
-        d.qpos[14:17] = [sx[i], sy[i], SLIDER_Z]
-        d.qpos[17:21] = squat[i]
+        d.qpos[layout.arm_qpos] = jp[i]
+        d.qpos[layout.gripper_qpos] = grip_closed
+        d.qpos[slider_pos_qpos] = [sx[i], sy[i], SLIDER_Z]
+        d.qpos[slider_quat_qpos] = squat[i]
         mujoco.mj_forward(m, d)
 
         grid = Image.new("RGB", (2 * PANE_W, 2 * PANE_H), (20, 20, 20))

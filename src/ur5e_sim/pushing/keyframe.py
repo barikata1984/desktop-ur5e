@@ -28,6 +28,7 @@ import numpy as np
 
 from ur5e_sim.core.env import get_named_object_id
 from ur5e_sim.core.ik import GRIPPER_CLOSED_CTRL, orientation_error, solve_ik
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.pushing.kinematics import R_TOOL0_DES
 from ur5e_sim.pushing.scene import build_push_model
 
@@ -37,15 +38,16 @@ def close_gripper_sim(
     d: mujoco.MjData,
     settle_time: float = 2.0,
 ) -> np.ndarray:
-    """Simulate gripper closing and return settled gripper joint values (qpos[6:14])."""
+    """Simulate gripper closing and return settled gripper joint values."""
+    layout = DofLayout.from_model(m)
     mujoco.mj_resetData(m, d)
-    d.qpos[:6] = np.array([-1.5708, -1.5708, 1.5708, -1.5708, -1.5708, 0.0])
-    d.ctrl[:6] = d.qpos[:6].copy()
-    d.ctrl[6] = GRIPPER_CLOSED_CTRL
+    d.qpos[layout.arm_qpos] = np.array([-1.5708, -1.5708, 1.5708, -1.5708, -1.5708, 0.0])
+    layout.set_arm_ctrl(d, d.qpos[layout.arm_qpos].copy())
+    layout.hold_gripper_ctrl(d, GRIPPER_CLOSED_CTRL)
     substeps = int(settle_time / m.opt.timestep)
     for _ in range(substeps):
         mujoco.mj_step(m, d)
-    gripper_qpos = d.qpos[6:14].copy()
+    gripper_qpos = d.qpos[layout.gripper_qpos].copy()
     print(f"Gripper closed joint values: {np.round(gripper_qpos, 6)}")
     return gripper_qpos
 
@@ -61,24 +63,27 @@ def compute_gravity_ctrl(
     For UR5e PD actuators: force = gain*ctrl + bias1*qpos (at steady state).
     To counteract gravity: ctrl = (grav_torque - bias1*qpos) / gain.
     """
+    layout = DofLayout.from_model(m)
     mujoco.mj_resetData(m, d)
-    d.qpos[:6] = q_arm.copy()
-    d.qpos[6:14] = gripper_qpos.copy()
+    d.qpos[layout.arm_qpos] = q_arm.copy()
+    d.qpos[layout.gripper_qpos] = gripper_qpos.copy()
     d.qvel[:] = 0
     d.qacc[:] = 0
     mujoco.mj_forward(m, d)
 
-    grav_torque = d.qfrc_bias[:6].copy()
-    ctrl_arm = np.zeros(6)
-    for i in range(6):
-        gain_i = m.actuator_gainprm[i, 0]
-        bias1_i = m.actuator_biasprm[i, 1]
+    grav_torque = d.qfrc_bias[layout.arm_dof].copy()
+    ctrl_arm = np.zeros(layout.n_arm)
+    for i in range(layout.n_arm):
+        aid = layout.arm_ctrl.start + i
+        gain_i = m.actuator_gainprm[aid, 0]
+        bias1_i = m.actuator_biasprm[aid, 1]
         ctrl_arm[i] = (grav_torque[i] - bias1_i * q_arm[i]) / gain_i
     return ctrl_arm
 
 
 def main() -> None:
     m, d = build_push_model()
+    layout = DofLayout.from_model(m)
 
     tip_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, "gripper_pinch")
     if tip_site_id is None:
@@ -158,10 +163,10 @@ def main() -> None:
 
     # Re-evaluate the winner's individual errors for reporting.
     mujoco.mj_resetData(m, d)
-    d.qpos[:6] = best_q
-    d.qpos[6:14] = gripper_qpos
-    d.ctrl[:6] = best_q
-    d.ctrl[6] = GRIPPER_CLOSED_CTRL
+    d.qpos[layout.arm_qpos] = best_q
+    d.qpos[layout.gripper_qpos] = gripper_qpos
+    layout.set_arm_ctrl(d, best_q)
+    layout.hold_gripper_ctrl(d, GRIPPER_CLOSED_CTRL)
     mujoco.mj_forward(m, d)
     tip_fk = d.site_xpos[tip_site_id].copy()
     best_perr = np.linalg.norm(target_tip - tip_fk)
@@ -180,10 +185,10 @@ def main() -> None:
     # Step 4: Verify gravity sag magnitude
     print("\nGravity sag check (1s settle from IK qpos)...")
     mujoco.mj_resetData(m, d)
-    d.qpos[:6] = best_q.copy()
-    d.qpos[6:14] = gripper_qpos.copy()
-    d.ctrl[:6] = ctrl_arm.copy()
-    d.ctrl[6] = 255.0
+    d.qpos[layout.arm_qpos] = best_q.copy()
+    d.qpos[layout.gripper_qpos] = gripper_qpos.copy()
+    layout.set_arm_ctrl(d, ctrl_arm.copy())
+    layout.hold_gripper_ctrl(d, 255.0)
     for _ in range(int(1.0 / m.opt.timestep)):
         mujoco.mj_step(m, d)
     mujoco.mj_forward(m, d)
