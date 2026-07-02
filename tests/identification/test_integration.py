@@ -10,7 +10,7 @@ import pytest
 
 mujoco = pytest.importorskip("mujoco")
 
-from ur5e_sim.core.env import load_model, reset_to_home  # noqa: E402
+from ur5e_sim.core.env import get_named_object_id, load_model, reset_to_home  # noqa: E402
 from ur5e_sim.identification import (  # noqa: E402
     BatchLeastSquares,
     BatchLSConfig,
@@ -20,8 +20,8 @@ from ur5e_sim.identification import (  # noqa: E402
     OptimizerConfig,
     PlaybackConfig,
     TrajectoryPlayback,
+    WorkspaceConstraintConfig,
     _TrajectoryCache,
-    body_inertial_parameters_from_model,
     compute_stacked_body_regressor,
     load_optimization_result,
     make_joint_acceleration_constraint,
@@ -102,12 +102,16 @@ def test_optimization_and_validation_roundtrip() -> None:
     assert sample.acceleration.shape == (expected_steps, NUM_JOINTS)
 
 
-@pytest.mark.xfail(
-    reason="identification scene has nq=14; gripper joints affect inverse dynamics, "
-    "causing mass estimation to diverge from the single-body ground truth"
-)
 def test_playback_and_estimation_pipeline() -> None:
-    """Playback a trajectory and run estimation."""
+    """Playback a trajectory and run estimation.
+
+    The FT sensor site (``ft_sensor``) sits on body ``gripper_mount``, and a
+    MuJoCo force/torque sensor measures the load of the entire subtree rooted
+    at that body -- not just the identification payload. The ground truth to
+    compare against is therefore ``model.body_subtreemass`` for
+    ``gripper_mount`` (gripper mechanism + rigidly-attached payload), not the
+    payload's own mass.
+    """
     loaded = _load_scene()
     nq, nv = loaded.model.nq, loaded.model.nv
     duration = 1.0
@@ -159,8 +163,10 @@ def test_playback_and_estimation_pipeline() -> None:
     estimator = BatchLeastSquares(BatchLSConfig())
     result = estimator.estimate(regressor, wrench_stacked)
 
-    true_params = body_inertial_parameters_from_model(loaded.model, BODY_NAME)
-    assert result.mass == pytest.approx(true_params.mass, rel=0.1)
+    ft_sensor_body_id = get_named_object_id(loaded.model, mujoco.mjtObj.mjOBJ_BODY, "gripper_mount")
+    assert ft_sensor_body_id is not None
+    expected_mass = float(loaded.model.body_subtreemass[ft_sensor_body_id])
+    assert result.mass == pytest.approx(expected_mass, rel=0.1)
 
 
 def test_constraints_accept_small_reject_large() -> None:
@@ -263,3 +269,74 @@ def test_json_io_preserves_all_fields() -> None:
     assert loaded.config.fps == pytest.approx(original.config.fps)
     assert loaded.config.body_name == original.config.body_name
     assert loaded.config.site_name == original.config.site_name
+
+
+def test_json_io_preserves_previously_defaulted_fields() -> None:
+    """Fields that used to silently reset to defaults survive save/load.
+
+    Regression test for the JSON round-trip only persisting a subset of
+    OptimizerConfig: objective_type, with_ft_offset, joint_limits, and
+    workspace_config previously reverted to their dataclass defaults after a
+    load, even when the original config set them to non-default values.
+    """
+    custom_joint_limits = JointLimits(
+        q_min=np.full(6, -1.5),
+        q_max=np.full(6, 1.5),
+        dq_max=np.full(6, 2.0),
+        ddq_max=np.full(6, 5.0),
+    )
+    custom_workspace_config = WorkspaceConstraintConfig(
+        max_displacement=0.3,
+        box_lower=np.array([-0.2, -0.2, 0.0]),
+        box_upper=np.array([0.2, 0.2, 0.4]),
+        safety_margin=0.02,
+    )
+    cfg = OptimizerConfig(
+        num_joints=NUM_JOINTS,
+        num_harmonics=3,
+        base_freq=0.15,
+        duration=5.0,
+        fps=100.0,
+        q0=Q0_ARM,
+        objective_type="condition_number",
+        with_ft_offset=True,
+        joint_limits=custom_joint_limits,
+        workspace_config=custom_workspace_config,
+    )
+    n = NUM_JOINTS * 3
+    rng = np.random.default_rng(7)
+    x_opt = rng.uniform(-0.1, 0.1, size=2 * n)
+    original = OptimizationResult(
+        x_opt=x_opt,
+        condition_number=42.0,
+        a_opt=x_opt[:n].reshape(NUM_JOINTS, 3),
+        b_opt=x_opt[n:].reshape(NUM_JOINTS, 3),
+        q0=Q0_ARM.copy(),
+        config=cfg,
+        n_evaluations=100,
+        wall_time=1.23,
+        n_restarts=5,
+        best_start_index=2,
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / "test_result.json"
+        save_optimization_result(original, path)
+        loaded = load_optimization_result(path)
+
+    assert loaded.config.objective_type == "condition_number"
+    assert loaded.config.with_ft_offset is True
+    assert loaded.config.joint_limits is not None
+    np.testing.assert_allclose(loaded.config.joint_limits.q_min, custom_joint_limits.q_min)
+    np.testing.assert_allclose(loaded.config.joint_limits.q_max, custom_joint_limits.q_max)
+    np.testing.assert_allclose(loaded.config.joint_limits.dq_max, custom_joint_limits.dq_max)
+    np.testing.assert_allclose(loaded.config.joint_limits.ddq_max, custom_joint_limits.ddq_max)
+    assert loaded.config.workspace_config is not None
+    assert loaded.config.workspace_config.max_displacement == pytest.approx(0.3)
+    np.testing.assert_allclose(
+        loaded.config.workspace_config.box_lower, custom_workspace_config.box_lower
+    )
+    np.testing.assert_allclose(
+        loaded.config.workspace_config.box_upper, custom_workspace_config.box_upper
+    )
+    assert loaded.config.workspace_config.safety_margin == pytest.approx(0.02)

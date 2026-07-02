@@ -1,4 +1,5 @@
 import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import numpy as np
@@ -7,6 +8,7 @@ import pytest
 mujoco = pytest.importorskip("mujoco")
 
 from ur5e_sim.core.env import load_model, reset_to_home  # noqa: E402
+from ur5e_sim.core.model_builder import build_ur5e_model  # noqa: E402
 from ur5e_sim.identification.constraints import (  # noqa: E402
     _TrajectoryCache,
 )
@@ -20,11 +22,13 @@ from ur5e_sim.identification.objective import (  # noqa: E402
     d_optimal_objective,
 )
 from ur5e_sim.identification.optimizer import (  # noqa: E402
+    UR5E_HOME_QPOS,
     EarlyStopConfig,
     ExcitationOptimizer,
     OptimizationResult,
     OptimizerConfig,
 )
+from ur5e_sim.identification.workspace import WorkspaceConstraintConfig  # noqa: E402
 
 from .conftest import SCENE_PATH  # noqa: E402
 
@@ -534,3 +538,84 @@ def test_optimize_early_stop_patience_parallel() -> None:
     assert isinstance(result, OptimizationResult)
     assert np.isfinite(result.condition_number)
     assert result.condition_number > 0
+
+
+def test_optimize_parallel_with_payload_workspace_config() -> None:
+    """Regression: workers must mirror the CLI's payload model.
+
+    ``_run_single_restart`` used to build a payload-less model, so any
+    ``payload_workspace_config`` crashed the worker with
+    ``ValueError: Unknown body: payload_payload_box_mount``. The model passed to
+    ``ExcitationOptimizer`` here is built the same way (with a payload), so its
+    prefixed names match what the worker reconstructs, and the final-result
+    diagnostics (run in this process on this model) also resolve correctly.
+    """
+    model, data = build_ur5e_model(payload_xml="scenes/objects/payload_flat.xml")
+    ws_cfg = WorkspaceConstraintConfig(
+        box_lower=np.array([-10.0, -10.0, -10.0]),
+        box_upper=np.array([10.0, 10.0, 10.0]),
+    )
+    cfg = OptimizerConfig(
+        num_joints=6,
+        num_harmonics=2,
+        base_freq=0.2,
+        duration=2.0,
+        fps=50.0,
+        q0=Q0,
+        subsample_factor=10,
+        n_monte_carlo=2,
+        max_iter_per_start=3,
+        seed=777,
+        n_workers=2,
+        payload_workspace_config=ws_cfg,
+        payload_xml="scenes/objects/payload_flat.xml",
+        # body_name/site_name left at OptimizerConfig defaults (the prefixed
+        # "payload_payload_box_mount" / "ft300s_ft_sensor"), matching the
+        # payload-attached model built above and the worker's own model.
+    )
+    opt = ExcitationOptimizer(cfg, model, data)
+    result = opt.optimize()
+
+    assert isinstance(result, OptimizationResult)
+    assert len(result.restart_history) == 2
+    assert np.isfinite(result.condition_number)
+
+
+@pytest.mark.skip(
+    reason=(
+        "UR5E_HOME_QPOS (pi/2-based, shared by optimizer.py and mpc/config.py) does not "
+        "match scenes/tasks/identification.xml's 'home' keyframe arm qpos "
+        "(1.324683, -1.468515, 1.368294, -1.470575, -1.570796, -0.246113). The two encode "
+        "different home poses; not expected to coincide until reconciled deliberately."
+    )
+)
+def test_ur5e_home_qpos_matches_xml_keyframe() -> None:
+    """UR5E_HOME_QPOS should equal the identification.xml keyframe's arm qpos."""
+    tree = ET.parse(SCENE_PATH)
+    key = tree.find(".//keyframe/key[@name='home']")
+    xml_qpos = np.array([float(v) for v in key.get("qpos").split()])
+    np.testing.assert_allclose(UR5E_HOME_QPOS, xml_qpos[:6])
+
+
+def test_iter_logs_key_structure() -> None:
+    """Pin the per-iteration diagnostic key set emitted by ``_execute_restart``.
+
+    Locks the sequential path's ``restart_history[*]["iter_logs"]`` schema so that
+    downstream diagnostics consumers notice if the key set changes.
+    """
+    loaded = _load_scene()
+    cfg = _snapshot_config()
+    opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
+    result = opt.optimize()
+
+    assert len(result.restart_history) > 0
+    iter_logs = result.restart_history[0]["iter_logs"]
+    assert len(iter_logs) > 0
+    expected_keys = {
+        "iter/condition_number",
+        "iter/objective",
+        "iter/restart_index",
+        "iter/iter_in_restart",
+        "iter/wall_time",
+    }
+    assert set(iter_logs[0].keys()) == expected_keys
