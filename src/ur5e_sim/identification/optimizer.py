@@ -224,6 +224,76 @@ def _compute_fourier_bounds_static(cfg: OptimizerConfig) -> Bounds | None:
     return Bounds(lb=-upper, ub=upper)
 
 
+def _make_objective(
+    cfg: OptimizerConfig,
+    cache: _TrajectoryCache,
+    model: mujoco.MjModel,
+    data: mujoco.MjData,
+) -> tuple[callable, list[float], list[float]]:
+    """Build the scipy objective and its latest obj/cond telemetry boxes."""
+    use_d_optimal = cfg.objective_type == "d_optimal"
+    column_scale = cfg.ft_offset_column_scale and cfg.with_ft_offset
+    latest_obj: list[float] = [float("inf")]
+    latest_cond: list[float] = [float("inf")]
+
+    def objective(x: np.ndarray) -> float:
+        if use_d_optimal:
+            obj_val, cond_val = d_optimal_with_cond(
+                x,
+                cache,
+                model,
+                data,
+                cfg.body_name,
+                cfg.subsample_factor,
+                with_ft_offset=cfg.with_ft_offset,
+                column_scale=column_scale,
+                site_name=cfg.site_name,
+            )
+        else:
+            obj_val = condition_number_objective(
+                x,
+                cache,
+                model,
+                data,
+                cfg.body_name,
+                cfg.subsample_factor,
+                with_ft_offset=cfg.with_ft_offset,
+                column_scale=column_scale,
+                site_name=cfg.site_name,
+            )
+            cond_val = obj_val
+        latest_obj[0] = obj_val
+        latest_cond[0] = cond_val
+        return obj_val
+
+    return objective, latest_obj, latest_cond
+
+
+def _final_condition_number(
+    x: np.ndarray,
+    result_fun: float,
+    cfg: OptimizerConfig,
+    cache: _TrajectoryCache,
+    model: mujoco.MjModel,
+    data: mujoco.MjData,
+) -> float:
+    """Re-evaluate the condition number for reporting after minimize."""
+    if cfg.objective_type == "d_optimal":
+        _, cond = d_optimal_with_cond(
+            x,
+            cache,
+            model,
+            data,
+            cfg.body_name,
+            cfg.subsample_factor,
+            with_ft_offset=cfg.with_ft_offset,
+            column_scale=cfg.ft_offset_column_scale and cfg.with_ft_offset,
+            site_name=cfg.site_name,
+        )
+        return cond
+    return float(result_fun)
+
+
 def _run_single_restart(
     config: OptimizerConfig,
     x0: np.ndarray,
@@ -240,44 +310,11 @@ def _run_single_restart(
     cache, constraints = _build_cache_and_constraints_static(config, model, data)
     fourier_bounds = _compute_fourier_bounds_static(config)
 
-    use_d_optimal = config.objective_type == "d_optimal"
-    column_scale = config.ft_offset_column_scale and config.with_ft_offset
+    objective, _latest_obj, _latest_cond = _make_objective(config, cache, model, data)
 
     # Track per-iteration metrics locally for batch logging
     iter_logs: list[dict[str, float]] = []
-    _latest_obj: list[float] = [float("inf")]
-    _latest_cond: list[float] = [float("inf")]
     iter_count = [0]
-
-    def objective(x: np.ndarray) -> float:
-        if use_d_optimal:
-            obj_val, cond_val = d_optimal_with_cond(
-                x,
-                cache,
-                model,
-                data,
-                config.body_name,
-                config.subsample_factor,
-                with_ft_offset=config.with_ft_offset,
-                column_scale=column_scale,
-                site_name=config.site_name,
-            )
-        else:
-            obj_val = condition_number_objective(
-                x,
-                cache,
-                model,
-                data,
-                config.body_name,
-                config.subsample_factor,
-                with_ft_offset=config.with_ft_offset,
-                column_scale=column_scale,
-                site_name=config.site_name,
-            )
-            cond_val = obj_val
-        _latest_obj[0] = obj_val
-        _latest_cond[0] = cond_val
-        return obj_val
 
     t0 = time.perf_counter()
 
@@ -305,20 +342,7 @@ def _run_single_restart(
     wall_time = time.perf_counter() - t0
 
     # Evaluate condition number for reporting
-    if use_d_optimal:
-        _, cond = d_optimal_with_cond(
-            result.x,
-            cache,
-            model,
-            data,
-            config.body_name,
-            config.subsample_factor,
-            with_ft_offset=config.with_ft_offset,
-            column_scale=column_scale,
-            site_name=config.site_name,
-        )
-    else:
-        cond = float(result.fun)
+    cond = _final_condition_number(result.x, result.fun, config, cache, model, data)
 
     named_margins = _evaluate_margins(result.x, constraints)
 
@@ -493,41 +517,8 @@ class ExcitationOptimizer:
         es = early_stop_config or EarlyStopConfig()
         patience_counter = 0
 
-        _latest_obj: list[float] = [float("inf")]
-        _latest_cond: list[float] = [float("inf")]
-
         use_d_optimal = cfg.objective_type == "d_optimal"
-        _column_scale = cfg.ft_offset_column_scale and cfg.with_ft_offset
-
-        def objective(x: np.ndarray) -> float:
-            if use_d_optimal:
-                obj_val, cond_val = d_optimal_with_cond(
-                    x,
-                    cache,
-                    self.model,
-                    self.data,
-                    cfg.body_name,
-                    cfg.subsample_factor,
-                    with_ft_offset=cfg.with_ft_offset,
-                    column_scale=_column_scale,
-                    site_name=cfg.site_name,
-                )
-            else:
-                cond_val = condition_number_objective(
-                    x,
-                    cache,
-                    self.model,
-                    self.data,
-                    cfg.body_name,
-                    cfg.subsample_factor,
-                    with_ft_offset=cfg.with_ft_offset,
-                    column_scale=_column_scale,
-                    site_name=cfg.site_name,
-                )
-                obj_val = cond_val
-            _latest_obj[0] = obj_val
-            _latest_cond[0] = cond_val
-            return obj_val
+        objective, _latest_obj, _latest_cond = _make_objective(cfg, cache, self.model, self.data)
 
         best_x: np.ndarray | None = None
         best_cond = float("inf")
@@ -583,20 +574,7 @@ class ExcitationOptimizer:
             margin = min(named_margins.values())
             feasible = margin >= 0
 
-            if use_d_optimal:
-                _, cond = d_optimal_with_cond(
-                    result.x,
-                    cache,
-                    self.model,
-                    self.data,
-                    cfg.body_name,
-                    cfg.subsample_factor,
-                    with_ft_offset=cfg.with_ft_offset,
-                    column_scale=_column_scale,
-                    site_name=cfg.site_name,
-                )
-            else:
-                cond = float(result.fun)
+            cond = _final_condition_number(result.x, result.fun, cfg, cache, self.model, self.data)
             obj_val = float(result.fun)
 
             if use_d_optimal:
