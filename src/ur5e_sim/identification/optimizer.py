@@ -114,10 +114,21 @@ class _RestartResult:
     n_func_evals: int
     n_iters: int
     wall_time: float
-    constraint_margin: float
-    feasible: bool
     named_margins: dict[str, float]
     iter_logs: list[dict[str, float]]
+
+    @property
+    def constraint_margin(self) -> float:
+        return min(self.named_margins.values())
+
+    @property
+    def feasible(self) -> bool:
+        return self.constraint_margin >= 0
+
+
+def _evaluate_margins(x: np.ndarray, constraints: list[dict]) -> dict[str, float]:
+    """Evaluate every constraint once, keyed by its 'name'."""
+    return {c.get("name", f"constraint_{i}"): float(c["fun"](x)) for i, c in enumerate(constraints)}
 
 
 def _config_to_wandb_dict(cfg: OptimizerConfig) -> dict:
@@ -309,11 +320,7 @@ def _run_single_restart(
     else:
         cond = float(result.fun)
 
-    margin = min(float(c["fun"](result.x)) for c in constraints)
-    named_margins = {
-        c.get("name", f"constraint_{i}"): float(c["fun"](result.x))
-        for i, c in enumerate(constraints)
-    }
+    named_margins = _evaluate_margins(result.x, constraints)
 
     return _RestartResult(
         restart_index=restart_index,
@@ -323,8 +330,6 @@ def _run_single_restart(
         n_func_evals=result.nfev,
         n_iters=iter_count[0],
         wall_time=wall_time,
-        constraint_margin=margin,
-        feasible=margin >= 0,
         named_margins=named_margins,
         iter_logs=iter_logs,
     )
@@ -367,17 +372,6 @@ class ExcitationOptimizer:
     def _compute_fourier_bounds(self) -> Bounds | None:
         """Compute scipy Bounds from analytical Fourier velocity bounds."""
         return _compute_fourier_bounds_static(self.config)
-
-    def _compute_constraint_margin(self, x: np.ndarray, constraints: list[dict]) -> float:
-        """Return the minimum constraint margin (>= 0 means all satisfied)."""
-        return min(float(c["fun"](x)) for c in constraints)
-
-    @staticmethod
-    def _compute_named_margins(x: np.ndarray, constraints: list[dict]) -> dict[str, float]:
-        """Compute per-constraint margin using the 'name' key."""
-        return {
-            c.get("name", f"constraint_{i}"): float(c["fun"](x)) for i, c in enumerate(constraints)
-        }
 
     def _compute_trajectory_stats(self, x: np.ndarray, cache: _TrajectoryCache) -> dict[str, float]:
         """Compute trajectory-level statistics for diagnostics."""
@@ -585,7 +579,8 @@ class ExcitationOptimizer:
             total_evals += result.nfev
             actual_restarts += 1
             restart_wall = time.perf_counter() - restart_t0
-            margin = self._compute_constraint_margin(result.x, constraints)
+            named_margins = _evaluate_margins(result.x, constraints)
+            margin = min(named_margins.values())
             feasible = margin >= 0
 
             if use_d_optimal:
@@ -625,7 +620,6 @@ class ExcitationOptimizer:
                 best_x = result.x.copy()
                 best_idx = i
 
-            named_margins = self._compute_named_margins(result.x, constraints)
             restart_summaries.append(
                 {
                     "restart_index": i,
@@ -873,7 +867,7 @@ class ExcitationOptimizer:
         a_opt = best_x[:n].reshape(cfg.num_joints, cfg.num_harmonics)
         b_opt = best_x[n:].reshape(cfg.num_joints, cfg.num_harmonics)
 
-        named_margins = self._compute_named_margins(best_x, constraints)
+        named_margins = _evaluate_margins(best_x, constraints)
         best_feasible = all(v >= 0 for v in named_margins.values())
         traj_stats = self._compute_trajectory_stats(best_x, cache)
 
