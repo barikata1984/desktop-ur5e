@@ -9,7 +9,7 @@
 - [x] テストの移行と全体検証
 - [x] devcontainer postCreateCommand の `python --version` 失敗を修正
 - [x] インタラクティブ軌道設計ツール (IK ベースコーンスイープ) の実装
-- [ ] ロボット XML をペイロードのオプション化でリファクタリング (ur5e_ft300s_gripper_no_payload.xml の重複解消)
+- [x] ロボット XML をペイロードのオプション化でリファクタリング (ur5e_ft300s_gripper_no_payload.xml の重複解消: MjSpec.attach() ベースの build_ur5e_model() に一本化し, 直書き XML シーンを削除)
 - [x] グリッドサーチ再実行: ロボット構成オフセット調整後 (attachment_site=0.094, gripper_base_mount=0.004) に全 24 条件が実行可能かを確認 (全条件実行完了, ただし全条件 infeasible — ISSUES 参照)
 - [ ] attachment_site 94mm vs DH パラメータ L_TP=100mm のギャップを物理的に確認し, 正しいオフセット値を決定
 - [x] push migration plan の実施: notes/PLAN_push_model_builder_migration.md に従い pushing/ と identification/ を build_ur5e_model() に移行
