@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import mujoco
 import numpy as np
 
+from ur5e_sim.core import names
 from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.identification.estimators.rtls import RecursiveTotalLeastSquares, RTLSConfig
 from ur5e_sim.identification.estimators.types import EstimationResult
@@ -92,9 +93,6 @@ class MPCLoop:
             data,
             PlaybackConfig(
                 use_pd_control=config.use_pd_control,
-                body_name=config.body_name,
-                site_name=config.site_name,
-                ft_site_name=config.ft_site_name,
                 noise_std_wrench=config.noise_std_wrench,
                 settle_time=0.0,
             ),
@@ -144,8 +142,8 @@ class MPCLoop:
                 q_meas,
                 dq_meas,
                 ddq_meas,
-                cfg.body_name,
-                site_name=cfg.ft_site_name,
+                names.PAYLOAD_BODY,
+                site_name=names.FT_SITE,
             )
             y_new = wrench.ravel()
 

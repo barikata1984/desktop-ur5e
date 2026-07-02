@@ -20,7 +20,6 @@ from pathlib import Path
 
 import numpy as np
 
-from ur5e_sim.core import names
 from ur5e_sim.core.env import get_workspace_bounds
 from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.core.model_builder import build_ur5e_model
@@ -130,8 +129,6 @@ def _run_condition_worker(label: str, cond_dict: dict, output_dir: str) -> dict:
         payload_workspace_config=WorkspaceConstraintConfig(
             box_lower=box_lower, box_upper=box_upper
         ),
-        body_name=names.PAYLOAD_BODY,
-        site_name=names.FT_SITE,
         ee_velocity_config=EeVelocityConfig(max_linear_velocity=cond.ee_vel),
         enable_velocity_constraint=False,
         enable_acceleration_constraint=True,

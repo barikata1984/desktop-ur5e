@@ -17,7 +17,6 @@ from .conftest import (  # noqa: E402
     load_identification_scene,
 )
 
-PAYLOAD_BODY_NAME = "payload_box_mount"
 Q0_ARM = np.array([np.pi / 2, -np.pi / 2, np.pi / 2, -np.pi / 2, -np.pi / 2, 0.0])
 
 
@@ -123,18 +122,12 @@ def test_playback_config_defaults() -> None:
     assert cfg.noise_std_q == 0.0
     assert cfg.noise_std_dq == 0.0
     assert cfg.noise_std_wrench == 0.0
-    assert cfg.body_name == "payload_box_mount"
-    assert cfg.site_name == "attachment_site"
 
 
 def test_trajectory_playback_open_loop() -> None:
     loaded = _load_payload_scene()
     nq, nv = loaded.model.nq, loaded.model.nv
-    cfg = PlaybackConfig(
-        body_name=PAYLOAD_BODY_NAME,
-        site_name="attachment_site",
-        ft_site_name="ft300s_ft_sensor",
-    )
+    cfg = PlaybackConfig()
     playback = TrajectoryPlayback(loaded.model, loaded.data, cfg)
 
     traj = _make_short_trajectory(5, nq, nv)
@@ -157,9 +150,6 @@ def test_trajectory_playback_with_noise() -> None:
     loaded = _load_payload_scene()
     nq, nv = loaded.model.nq, loaded.model.nv
     cfg = PlaybackConfig(
-        body_name=PAYLOAD_BODY_NAME,
-        site_name="attachment_site",
-        ft_site_name="ft300s_ft_sensor",
         noise_std_q=0.01,
         noise_std_dq=0.01,
         noise_std_wrench=0.1,
@@ -179,11 +169,7 @@ def test_trajectory_playback_with_noise() -> None:
 def test_compute_tracking_error_keys() -> None:
     loaded = _load_payload_scene()
     nq, nv = loaded.model.nq, loaded.model.nv
-    cfg = PlaybackConfig(
-        body_name=PAYLOAD_BODY_NAME,
-        site_name="attachment_site",
-        ft_site_name="ft300s_ft_sensor",
-    )
+    cfg = PlaybackConfig()
     playback = TrajectoryPlayback(loaded.model, loaded.data, cfg)
 
     traj = _make_short_trajectory(5, nq, nv)
@@ -206,9 +192,6 @@ def test_compute_tracking_error_with_noise() -> None:
     loaded = _load_payload_scene()
     nq, nv = loaded.model.nq, loaded.model.nv
     cfg = PlaybackConfig(
-        body_name=PAYLOAD_BODY_NAME,
-        site_name="attachment_site",
-        ft_site_name="ft300s_ft_sensor",
         noise_std_q=0.05,
     )
     playback = TrajectoryPlayback(loaded.model, loaded.data, cfg)

@@ -8,6 +8,7 @@ import mujoco
 import numpy as np
 from scipy.optimize import minimize
 
+from ur5e_sim.core import names
 from ur5e_sim.identification.constraints import (
     make_joint_acceleration_constraint,
     make_joint_position_constraint,
@@ -89,8 +90,6 @@ def _make_objective(
     config: MPCConfig,
     W_accumulated: np.ndarray | None,
 ) -> Callable[[np.ndarray], float]:
-    body_name = config.body_name
-    ft_site_name = config.ft_site_name
     subsample = config.horizon.subsample_factor
 
     def objective(x: np.ndarray) -> float:
@@ -102,9 +101,9 @@ def _make_objective(
                 sample.position,
                 sample.velocity,
                 sample.acceleration,
-                body_name,
+                names.PAYLOAD_BODY,
                 subsample_factor=subsample,
-                site_name=ft_site_name,
+                site_name=names.FT_SITE,
             )
             W = np.vstack([W_accumulated, W_new]) if W_accumulated is not None else W_new
             return compute_condition_number(W)
@@ -237,7 +236,7 @@ class ExcitationPlanner:
                 self._model,
                 self._data,
                 sample.position,
-                cfg.body_name,
+                names.PAYLOAD_BODY,
                 subsample=hcfg.subsample_factor,
             ),
             acceleration_peak=acceleration_peak(sample),

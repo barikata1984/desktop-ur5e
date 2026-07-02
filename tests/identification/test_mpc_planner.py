@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.identification.mpc import MPCConfig, PlannerConfig
 from ur5e_sim.identification.mpc.planner import ExcitationPlanner, PlanResult
 
@@ -20,13 +21,10 @@ def loaded():
 
 @pytest.fixture(scope="module")
 def planner(loaded):
-    # Post-attach names on the builder model (MPCConfig defaults still assume the
-    # dead direct-XML scene; overridden here until Stage 4 fixes the defaults).
+    q0 = DofLayout.from_model(loaded.model).arm(loaded.data.qpos).copy()
     config = MPCConfig(
         planner=PlannerConfig(n_restarts=2, max_iter_per_start=60),
-        body_name="payload_box_mount",
-        site_name="attachment_site",
-        ft_site_name="ft300s_ft_sensor",
+        q0=q0,
     )
     return ExcitationPlanner(config, loaded.model, loaded.data)
 

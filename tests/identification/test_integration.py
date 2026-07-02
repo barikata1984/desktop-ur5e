@@ -77,8 +77,6 @@ def test_optimization_and_validation_roundtrip() -> None:
         n_monte_carlo=1,
         max_iter_per_start=3,
         seed=42,
-        body_name=BODY_NAME,
-        site_name="ft300s_ft_sensor",
     )
     opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
     result = opt.optimize()
@@ -137,7 +135,6 @@ def test_playback_and_estimation_pipeline() -> None:
     traj = _pad_sample(traj_arm, nq, nv)
 
     playback_cfg = PlaybackConfig(
-        body_name=BODY_NAME,
         wrench_source="analytic",
     )
     playback = TrajectoryPlayback(loaded.model, loaded.data, playback_cfg)
@@ -267,8 +264,6 @@ def test_json_io_preserves_all_fields() -> None:
     assert loaded.config.base_freq == pytest.approx(original.config.base_freq)
     assert loaded.config.duration == pytest.approx(original.config.duration)
     assert loaded.config.fps == pytest.approx(original.config.fps)
-    assert loaded.config.body_name == original.config.body_name
-    assert loaded.config.site_name == original.config.site_name
 
 
 def test_json_io_preserves_previously_defaulted_fields() -> None:

@@ -178,8 +178,7 @@ def test_optimizer_config_defaults() -> None:
     assert cfg.base_freq == 0.1
     assert cfg.duration == 10.0
     assert cfg.fps == 100.0
-    assert cfg.q0 is not None
-    assert cfg.q0.shape == (6,)
+    assert cfg.q0 is None  # callers derive q0 from the model's home keyframe
     assert cfg.subsample_factor == 10
     assert cfg.n_monte_carlo == 20
     assert cfg.max_iter_per_start == 200
@@ -188,8 +187,6 @@ def test_optimizer_config_defaults() -> None:
     assert cfg.ftol == 1e-6
     assert cfg.seed == 42
     assert cfg.joint_limits is not None
-    assert cfg.body_name == "payload_box_mount"
-    assert cfg.site_name == "ft300s_ft_sensor"
 
 
 # --- _generate_random_x0 tests ---
@@ -233,8 +230,6 @@ def test_optimize_smoke() -> None:
         n_monte_carlo=2,
         max_iter_per_start=5,
         seed=123,
-        body_name=BODY_NAME,
-        site_name=FT_SITE_NAME,
     )
     opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
     result = opt.optimize()
@@ -266,8 +261,6 @@ def test_optimize_smoke_d_optimal() -> None:
         max_iter_per_start=5,
         objective_type="d_optimal",
         seed=123,
-        body_name=BODY_NAME,
-        site_name=FT_SITE_NAME,
     )
     opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
     result = opt.optimize()
@@ -385,8 +378,6 @@ def test_validate_trajectory_returns_expected_keys() -> None:
         n_monte_carlo=1,
         max_iter_per_start=2,
         seed=0,
-        body_name=BODY_NAME,
-        site_name=FT_SITE_NAME,
     )
     opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
 
@@ -433,8 +424,6 @@ def _snapshot_config(**overrides) -> OptimizerConfig:
         n_monte_carlo=2,
         max_iter_per_start=3,
         seed=777,
-        body_name=BODY_NAME,
-        site_name=FT_SITE_NAME,
     )
     kwargs.update(overrides)
     return OptimizerConfig(**kwargs)
@@ -564,9 +553,6 @@ def test_optimize_parallel_with_payload_workspace_config() -> None:
         n_workers=2,
         payload_workspace_config=ws_cfg,
         payload_xml="scenes/objects/payload_flat.xml",
-        # body_name/site_name left at OptimizerConfig defaults (the post-attach
-        # "payload_box_mount" / "ft300s_ft_sensor"), matching the
-        # payload-attached model built above and the worker's own model.
     )
     opt = ExcitationOptimizer(cfg, model, data)
     result = opt.optimize()

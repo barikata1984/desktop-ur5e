@@ -24,8 +24,6 @@ from ur5e_sim.identification.objective import (
 )
 from ur5e_sim.identification.workspace import EeVelocityConfig, WorkspaceConstraintConfig
 
-UR5E_HOME_QPOS = np.array([np.pi / 2, -np.pi / 2, np.pi / 2, -np.pi / 2, -np.pi / 2, 0.0])
-
 log = logging.getLogger(__name__)
 
 
@@ -49,8 +47,6 @@ class OptimizerConfig:
     payload_workspace_config: WorkspaceConstraintConfig | None = None
     collision_config: CollisionConfig | None = None
     ee_velocity_config: EeVelocityConfig | None = None
-    body_name: str = names.PAYLOAD_BODY
-    site_name: str = names.FT_SITE
     enable_velocity_constraint: bool = True
     enable_acceleration_constraint: bool = True
     use_fourier_bounds: bool = False
@@ -60,8 +56,6 @@ class OptimizerConfig:
     payload_xml: str | None = None  # Payload MJCF for worker model construction (mirrors CLI)
 
     def __post_init__(self) -> None:
-        if self.q0 is None:
-            self.q0 = UR5E_HOME_QPOS.copy()
         if self.joint_limits is None:
             self.joint_limits = JointLimits()
 
@@ -148,8 +142,6 @@ def _config_to_wandb_dict(cfg: OptimizerConfig) -> dict:
         "optimizer_method": cfg.optimizer_method,
         "ftol": cfg.ftol,
         "seed": cfg.seed,
-        "body_name": cfg.body_name,
-        "site_name": cfg.site_name,
         "n_decision_vars": 2 * cfg.num_joints * cfg.num_harmonics,
     }
     if cfg.q0 is not None:
@@ -196,9 +188,9 @@ def _build_cache_and_constraints_static(
         model=model,
         data=data,
         payload_workspace_config=cfg.payload_workspace_config,
-        payload_body_name=cfg.body_name,
+        payload_body_name=names.PAYLOAD_BODY,
         ee_velocity_config=cfg.ee_velocity_config,
-        site_name=cfg.site_name,
+        site_name=names.FT_SITE,
         enable_velocity_constraint=cfg.enable_velocity_constraint,
         enable_acceleration_constraint=cfg.enable_acceleration_constraint,
     )
@@ -245,11 +237,11 @@ def _make_objective(
                 cache,
                 model,
                 data,
-                cfg.body_name,
+                names.PAYLOAD_BODY,
                 cfg.subsample_factor,
                 with_ft_offset=cfg.with_ft_offset,
                 column_scale=column_scale,
-                site_name=cfg.site_name,
+                site_name=names.FT_SITE,
             )
         else:
             obj_val = condition_number_objective(
@@ -257,11 +249,11 @@ def _make_objective(
                 cache,
                 model,
                 data,
-                cfg.body_name,
+                names.PAYLOAD_BODY,
                 cfg.subsample_factor,
                 with_ft_offset=cfg.with_ft_offset,
                 column_scale=column_scale,
-                site_name=cfg.site_name,
+                site_name=names.FT_SITE,
             )
             cond_val = obj_val
         latest_obj[0] = obj_val
@@ -286,11 +278,11 @@ def _final_condition_number(
             cache,
             model,
             data,
-            cfg.body_name,
+            names.PAYLOAD_BODY,
             cfg.subsample_factor,
             with_ft_offset=cfg.with_ft_offset,
             column_scale=cfg.ft_offset_column_scale and cfg.with_ft_offset,
-            site_name=cfg.site_name,
+            site_name=names.FT_SITE,
         )
         return cond
     return float(result_fun)
@@ -819,7 +811,7 @@ class ExcitationOptimizer:
             result.x_opt,
             self.model,
             self.data,
-            cfg.body_name,
+            names.PAYLOAD_BODY,
             cfg.num_joints,
             cfg.num_harmonics,
             cfg.base_freq,
@@ -828,7 +820,7 @@ class ExcitationOptimizer:
             q0,
             with_ft_offset=cfg.with_ft_offset,
             column_scale=cfg.ft_offset_column_scale and cfg.with_ft_offset,
-            site_name=cfg.site_name,
+            site_name=names.FT_SITE,
         )
 
         _, full_constraints = self._build_cache_and_constraints()

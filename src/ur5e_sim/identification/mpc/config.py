@@ -4,9 +4,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ur5e_sim.core import names
 from ur5e_sim.identification.constraints import JointLimits
-from ur5e_sim.identification.optimizer import UR5E_HOME_QPOS
 
 
 @dataclass
@@ -45,13 +43,11 @@ class MPCConfig:
 
     # Robot
     num_joints: int = 6
-    q0: np.ndarray | None = None  # initial position (None -> UR5E_HOME_QPOS)
+    # Initial position. Callers should derive this from the model's "home"
+    # keyframe (see build_ur5e_model()) rather than relying on a config default.
+    q0: np.ndarray | None = None
     joint_limits: JointLimits = field(default_factory=JointLimits)
 
-    # MuJoCo identifiers, canonical to models from build_ur5e_model().
-    body_name: str = names.PAYLOAD_BODY
-    site_name: str = names.EE_SITE  # EE pose frame (for playback)
-    ft_site_name: str = names.FT_SITE  # FT sensor site (for regressor sampling)
     n_inertial_params: int = 10  # inertial parameter count for RTLS
 
     # Execution
@@ -59,8 +55,6 @@ class MPCConfig:
     noise_std_wrench: float = 0.0
 
     def __post_init__(self) -> None:
-        if self.q0 is None:
-            self.q0 = UR5E_HOME_QPOS.copy()
         if self.replan_period > self.horizon.duration:
             raise ValueError(
                 f"replan_period ({self.replan_period}) must be "

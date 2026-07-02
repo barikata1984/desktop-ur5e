@@ -35,23 +35,9 @@ class PlaybackConfig:
     noise_std_q: float = 0.0
     noise_std_dq: float = 0.0
     noise_std_wrench: float = 0.0
-    body_name: str = names.PAYLOAD_BODY
-    # Site used to record the EE pose (position/rotation) at each timestep.
-    site_name: str = names.EE_SITE
-    # Site of the FT sensor, used only by the analytic-wrench fallback below
-    # (when the model has no FT force/torque sensors) to evaluate the body
-    # regressor about the same frame a real FT sensor would report in. This is
-    # a DIFFERENT site from `site_name` above.
-    ft_site_name: str = names.FT_SITE
     # Seconds to hold the initial target before recording so the arm settles
     # into its gravity-loaded equilibrium (PD-servo mode only).
     settle_time: float = 1.0
-    # Names of the MuJoCo force/torque sensors at the tool0 site. When both are
-    # present in the model, the recorded wrench is read from these sensors
-    # (interaction force/torque in the site frame) instead of being computed
-    # analytically from the rigid-body regressor.
-    force_sensor_name: str = names.FT_FORCE_SENSOR
-    torque_sensor_name: str = names.FT_TORQUE_SENSOR
     # "auto": use the FT sensor when it resolves, else fall back to the analytic
     #   rigid-body regressor wrench (warns on fallback instead of failing silently).
     # "sensor": require the FT sensor to resolve; raise ValueError if it does not.
@@ -98,13 +84,13 @@ class TrajectoryPlayback:
         use_ft_sensor = False
         if cfg.wrench_source in ("auto", "sensor"):
             try:
-                ft_sensor = FTSensor(model, cfg.force_sensor_name, cfg.torque_sensor_name)
+                ft_sensor = FTSensor(model, names.FT_FORCE_SENSOR, names.FT_TORQUE_SENSOR)
                 use_ft_sensor = True
             except ValueError:
                 if cfg.wrench_source == "sensor":
                     raise
                 warnings.warn(
-                    f"FT sensors {cfg.force_sensor_name!r}/{cfg.torque_sensor_name!r} not "
+                    f"FT sensors {names.FT_FORCE_SENSOR!r}/{names.FT_TORQUE_SENSOR!r} not "
                     "found in model; falling back to the analytic rigid-body regressor wrench.",
                     stacklevel=2,
                 )
@@ -112,10 +98,10 @@ class TrajectoryPlayback:
         # The analytic-fallback wrench needs the payload's rigid-body inertia.
         # The FT-sensor path does not, so only resolve it when needed -- this lets
         # the playback run against models (e.g. an articulated gripper) where
-        # cfg.body_name does not name a single rigid body.
+        # names.PAYLOAD_BODY does not name a single rigid body.
         params = None
         if not use_ft_sensor:
-            params = body_inertial_parameters_from_model(model, cfg.body_name)
+            params = body_inertial_parameters_from_model(model, names.PAYLOAD_BODY)
 
         # Pad trajectory to model DOFs when it covers only a subset (e.g. 6 arm
         # joints on a 14-DOF model with gripper). Extra DOFs are held at zero.
@@ -185,7 +171,7 @@ class TrajectoryPlayback:
                 ddq_meas = ddq_des.copy()
 
             # Get EE pose
-            frame = get_site_frame(model, data, cfg.site_name)
+            frame = get_site_frame(model, data, names.EE_SITE)
             if frame is not None:
                 ee_pos = np.array(frame.position, dtype=np.float64)
                 ee_rot = np.array(frame.rotation, dtype=np.float64)
@@ -197,9 +183,9 @@ class TrajectoryPlayback:
                 wrench = ft_sensor.read(model, data)
             else:
                 # Fallback: analytic rigid-body regressor wrench ([torque; force]),
-                # evaluated about the FT sensor site (cfg.ft_site_name), not the
-                # EE-pose site (cfg.site_name).
-                reg_sample = sample_body_regressor(model, data, cfg.body_name, cfg.ft_site_name)
+                # evaluated about the FT sensor site (names.FT_SITE), not the
+                # EE-pose site (names.EE_SITE).
+                reg_sample = sample_body_regressor(model, data, names.PAYLOAD_BODY, names.FT_SITE)
                 wrench = compute_wrench_from_parameters(reg_sample.regressor, params)
 
             # Add measurement noise

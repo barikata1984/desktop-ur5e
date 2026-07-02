@@ -43,23 +43,20 @@ def _resolve_payload_xml(opt_result) -> str | None:
     """Return the payload MJCF the optimization result was generated against.
 
     Older result JSONs predate ``OptimizerConfig.payload_xml`` and have no
-    ``payload_xml`` field. If ``body_name`` names the payload body, the
-    trajectory was almost certainly optimized against a payload-attached
-    model, so warn and fall back to the flat payload used before per-payload
-    configuration existed.
+    ``payload_xml`` field. The optimizer always attaches a payload at
+    ``names.PAYLOAD_BODY``, so a missing field implies the trajectory was
+    optimized against the flat payload used before per-payload configuration
+    existed; warn and fall back to it.
     """
     payload_xml = opt_result.config.payload_xml
     if payload_xml is not None:
         return payload_xml
-    if opt_result.config.body_name == names.PAYLOAD_BODY:
-        warnings.warn(
-            "Optimization result JSON has no 'payload_xml' (legacy result) but "
-            f"body_name={opt_result.config.body_name!r} implies a payload was attached; "
-            f"defaulting to {_LEGACY_PAYLOAD_XML!r}.",
-            stacklevel=2,
-        )
-        return _LEGACY_PAYLOAD_XML
-    return None
+    warnings.warn(
+        "Optimization result JSON has no 'payload_xml' (legacy result); "
+        f"defaulting to {_LEGACY_PAYLOAD_XML!r}.",
+        stacklevel=2,
+    )
+    return _LEGACY_PAYLOAD_XML
 
 
 @dataclass
@@ -179,18 +176,15 @@ def main() -> None:
     model, data = build_ur5e_model(payload_xml=payload_xml)
     print(f"Built identification model via MjSpec (payload_xml={payload_xml!r})")
 
-    body_name = opt_result.config.body_name
-    true_params_obj = body_inertial_parameters_from_model(model, body_name)
+    true_params_obj = body_inertial_parameters_from_model(model, names.PAYLOAD_BODY)
     true_phi = true_params_obj.to_vector()
-    print(f"True parameters for '{body_name}': mass={true_params_obj.mass:.6f} kg")
+    print(f"True parameters for '{names.PAYLOAD_BODY}': mass={true_params_obj.mass:.6f} kg")
 
     playback_config = PlaybackConfig(
         use_pd_control=False,
         noise_std_q=config.noise_std,
         noise_std_dq=config.noise_std,
         noise_std_wrench=config.noise_std,
-        body_name=body_name,
-        site_name=opt_result.config.site_name,
     )
     rng = np.random.default_rng(42) if config.noise_std > 0 else None
 
@@ -200,7 +194,7 @@ def main() -> None:
     print(f"Collected {len(buffer)} samples")
 
     print("Building regressor matrices...")
-    A, y_vec = buffer.build_regressor_data(model, data, body_name, opt_result.config.site_name)
+    A, y_vec = buffer.build_regressor_data(model, data, names.PAYLOAD_BODY, names.FT_SITE)
     print(f"Regressor shape: A={A.shape}, y={y_vec.shape}")
 
     print(f"Running estimator: {config.estimator}")

@@ -5,6 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.identification.mpc.config import MPCConfig, PlannerConfig
 from ur5e_sim.identification.mpc.loop import MPCLoop, _slice_trajectory
 from ur5e_sim.trajectories.base import TrajectorySample
@@ -16,21 +17,18 @@ def _load_and_reset():
     return load_identification_scene()
 
 
-def _short_config() -> MPCConfig:
-    # Post-attach names on the builder model (MPCConfig defaults still assume the
-    # dead direct-XML scene; overridden here until Stage 4 fixes the defaults).
+def _short_config(loaded) -> MPCConfig:
+    q0 = DofLayout.from_model(loaded.model).arm(loaded.data.qpos).copy()
     return MPCConfig(
         max_mpc_steps=2,
         planner=PlannerConfig(n_restarts=2, max_iter_per_start=20),
-        body_name="payload_box_mount",
-        site_name="attachment_site",
-        ft_site_name="ft300s_ft_sensor",
+        q0=q0,
     )
 
 
 def test_mpc_loop_runs():
     loaded = _load_and_reset()
-    mpc = MPCLoop(_short_config(), loaded.model, loaded.data)
+    mpc = MPCLoop(_short_config(loaded), loaded.model, loaded.data)
     result = mpc.run()
 
     assert result is not None
@@ -42,7 +40,7 @@ def test_mpc_loop_runs():
 
 def test_state_continuity():
     loaded = _load_and_reset()
-    mpc = MPCLoop(_short_config(), loaded.model, loaded.data)
+    mpc = MPCLoop(_short_config(loaded), loaded.model, loaded.data)
     result = mpc.run()
 
     if len(result.steps) >= 2:

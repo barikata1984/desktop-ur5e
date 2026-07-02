@@ -98,8 +98,8 @@ def save_optimization_result(
             "optimizer_method": cfg.optimizer_method,
             "ftol": cfg.ftol,
             "seed": cfg.seed,
-            "body_name": cfg.body_name,
-            "site_name": cfg.site_name,
+            "body_name": names.PAYLOAD_BODY,
+            "site_name": names.FT_SITE,
             "payload_xml": cfg.payload_xml,
             "objective_type": cfg.objective_type,
             "joint_limits": (
@@ -158,8 +158,8 @@ def load_optimization_result(path: str | Path) -> OptimizationResult:
         optimizer_method=cfg_dict["optimizer_method"],
         ftol=cfg_dict["ftol"],
         seed=cfg_dict["seed"],
-        body_name=cfg_dict["body_name"],
-        site_name=cfg_dict["site_name"],
+        # "body_name"/"site_name" keys are legacy metadata (ignored on load; the
+        # names are canonical constants, see ur5e_sim.core.names).
         payload_xml=cfg_dict.get("payload_xml", OptimizerConfig.payload_xml),
         objective_type=cfg_dict.get("objective_type", OptimizerConfig.objective_type),
         joint_limits=_joint_limits_from_dict(cfg_dict.get("joint_limits")),
