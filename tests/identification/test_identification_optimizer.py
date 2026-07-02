@@ -20,6 +20,7 @@ from ur5e_sim.identification.objective import (  # noqa: E402
     d_optimal_objective,
 )
 from ur5e_sim.identification.optimizer import (  # noqa: E402
+    EarlyStopConfig,
     ExcitationOptimizer,
     OptimizationResult,
     OptimizerConfig,
@@ -416,3 +417,120 @@ def test_validate_trajectory_returns_expected_keys() -> None:
     assert isinstance(validation["all_constraints_satisfied"], bool)
     assert isinstance(validation["constraint_margins"], list)
     assert len(validation["constraint_margins"]) >= 3
+
+
+# --- Characterization tests (pin behavior across optimizer refactor) ---
+
+
+def _snapshot_config(**overrides) -> OptimizerConfig:
+    kwargs = dict(
+        num_joints=6,
+        num_harmonics=2,
+        base_freq=0.2,
+        duration=2.0,
+        fps=50.0,
+        q0=Q0,
+        subsample_factor=10,
+        n_monte_carlo=2,
+        max_iter_per_start=3,
+        seed=777,
+        body_name=BODY_NAME,
+        site_name=FT_SITE_NAME,
+    )
+    kwargs.update(overrides)
+    return OptimizerConfig(**kwargs)
+
+
+def test_optimize_deterministic_snapshot() -> None:
+    """Pin the numeric path so the refactor stays bit-compatible (sequential)."""
+    loaded = _load_scene()
+    cfg = _snapshot_config()
+    opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
+    result = opt.optimize()
+
+    expected_x = [
+        5.967200555151849,
+        1.0635120360020374,
+        -1.9044482289892724,
+        -7.374840320957725,
+        -1.3129578384797584,
+        -7.1214454168968055,
+        -2.2547334197205604,
+        -7.4224342949358295,
+        1.4325111095891239,
+        -0.7342554657838596,
+        -5.872204713448335,
+        0.074800088583183,
+        1.823303431089319,
+        -4.680948960544693,
+        -5.246639017455377,
+        -4.072105339437789,
+        -5.209178171932785,
+        -4.369644531778122,
+        -5.190979778819246,
+        -3.544957216305769,
+        -0.16795705876867198,
+        0.30892900573220483,
+        -0.3372101817407813,
+        4.871152084101728,
+    ]
+    np.testing.assert_allclose(result.x_opt, expected_x, rtol=1e-10)
+    np.testing.assert_allclose(result.condition_number, 7.540677480196784, rtol=1e-10)
+
+
+def test_optimize_parallel_smoke() -> None:
+    """Parallel workers build their own prefixed model; only check completion."""
+    loaded = _load_scene()
+    # DEFAULT (prefixed) body/site names: the worker builds its own prefixed model.
+    cfg = OptimizerConfig(
+        num_joints=6,
+        num_harmonics=2,
+        base_freq=0.2,
+        duration=2.0,
+        fps=50.0,
+        q0=Q0,
+        subsample_factor=10,
+        n_monte_carlo=2,
+        max_iter_per_start=3,
+        seed=777,
+        n_workers=2,
+    )
+    opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
+    result = opt.optimize()
+
+    assert isinstance(result, OptimizationResult)
+    assert len(result.restart_history) == 2
+    assert result.condition_number > 0
+    assert np.isfinite(result.condition_number)
+
+
+def test_optimize_early_stop_patience() -> None:
+    """Sequential early stop terminates before exhausting all restarts."""
+    loaded = _load_scene()
+    cfg = _snapshot_config(n_monte_carlo=5)
+    opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
+    result = opt.optimize(early_stop_config=EarlyStopConfig(enabled=True, patience=1))
+    assert result.n_restarts < 5
+
+
+def test_optimize_early_stop_patience_parallel() -> None:
+    """Parallel early stop terminates and returns a valid result (order nondeterministic)."""
+    loaded = _load_scene()
+    cfg = OptimizerConfig(
+        num_joints=6,
+        num_harmonics=2,
+        base_freq=0.2,
+        duration=2.0,
+        fps=50.0,
+        q0=Q0,
+        subsample_factor=10,
+        n_monte_carlo=5,
+        max_iter_per_start=3,
+        seed=777,
+        n_workers=2,
+    )
+    opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
+    result = opt.optimize(early_stop_config=EarlyStopConfig(enabled=True, patience=1))
+    assert isinstance(result, OptimizationResult)
+    assert np.isfinite(result.condition_number)
+    assert result.condition_number > 0
