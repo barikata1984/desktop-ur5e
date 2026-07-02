@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ur5e_sim.core import names
 from ur5e_sim.core.controllers.base import Controller
 from ur5e_sim.core.controllers.registry import (
     available_controllers,
@@ -14,6 +15,7 @@ from ur5e_sim.core.ik import (
     get_jacobian6,
     orientation_error,
 )
+from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.core.logging.base import Logger
 from ur5e_sim.core.logging.npz import NpzLogger
 from ur5e_sim.core.renderer import FrameRenderer, encode_video, render_scene
@@ -30,6 +32,7 @@ from ur5e_sim.core.types import (
 __all__ = [
     "Controller",
     "ContactSensor",
+    "DofLayout",
     "FTSensor",
     "FramePose",
     "FrameRenderer",
@@ -50,6 +53,7 @@ __all__ = [
     "get_site_body_name",
     "get_site_frame",
     "make_controller",
+    "names",
     "orientation_error",
     "register_controller",
     "render_scene",
