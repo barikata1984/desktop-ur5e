@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import mujoco
 import numpy as np
 
+from ur5e_sim.core import names
 from ur5e_sim.core.env import get_named_object_id
 from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.identification.constraints import _TrajectoryCache
@@ -30,7 +31,7 @@ def _evaluate_workspace_positions(
     model: mujoco.MjModel,
     data: mujoco.MjData,
     q_trajectory: np.ndarray,
-    site_name: str = "attachment_site",
+    site_name: str = names.EE_SITE,
 ) -> np.ndarray:
     """Return EE positions (n_steps, 3) for each timestep."""
     site_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_SITE, site_name)
@@ -57,7 +58,7 @@ def evaluate_workspace_displacement(
     model: mujoco.MjModel,
     data: mujoco.MjData,
     q_trajectory: np.ndarray,
-    site_name: str = "attachment_site",
+    site_name: str = names.EE_SITE,
 ) -> np.ndarray:
     """Compute EE displacement from initial position for each timestep."""
     positions = _evaluate_workspace_positions(model, data, q_trajectory, site_name)
@@ -70,7 +71,7 @@ def make_workspace_constraint(
     workspace_config: WorkspaceConstraintConfig,
     model: mujoco.MjModel,
     data: mujoco.MjData,
-    site_name: str = "attachment_site",
+    site_name: str = names.EE_SITE,
 ) -> Callable[[np.ndarray], float]:
     """Return f(x)->float >= 0 iff EE stays within max displacement."""
 
@@ -89,7 +90,7 @@ def make_box_workspace_constraint(
     workspace_config: WorkspaceConstraintConfig,
     model: mujoco.MjModel,
     data: mujoco.MjData,
-    site_name: str = "attachment_site",
+    site_name: str = names.EE_SITE,
 ) -> Callable[[np.ndarray], float]:
     """Return f(x)->float >= 0 iff EE stays within box bounds."""
     # Hoist static array conversions out of the hot loop
@@ -144,7 +145,7 @@ def _box_surface_points(half_extents: np.ndarray, offset: np.ndarray) -> np.ndar
 def find_payload_constraint_geom(
     model: mujoco.MjModel,
     body_name: str,
-    preferred_geom: str = "payload_box_red",
+    preferred_geom: str = names.PAYLOAD_GEOM,
 ) -> int:
     """Return the geom id of the box used for payload workspace/collision constraints.
 
@@ -239,7 +240,7 @@ def make_payload_workspace_constraint(
     workspace_config: WorkspaceConstraintConfig,
     model: mujoco.MjModel,
     data: mujoco.MjData,
-    body_name: str = "payload_box_mount",
+    body_name: str = names.PAYLOAD_BODY,
 ) -> Callable[[np.ndarray], float]:
     """Return f(x)->float >= 0 iff all payload surface sample points stay within box bounds."""
     lower = (
@@ -268,7 +269,7 @@ def _evaluate_ee_linear_velocity(
     data: mujoco.MjData,
     q_trajectory: np.ndarray,
     dq_trajectory: np.ndarray,
-    site_name: str = "attachment_site",
+    site_name: str = names.EE_SITE,
 ) -> np.ndarray:
     """Return EE linear speed (n_steps,) for each timestep."""
     site_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_SITE, site_name)
@@ -302,7 +303,7 @@ def make_ee_velocity_constraint(
     ee_velocity_config: EeVelocityConfig,
     model: mujoco.MjModel,
     data: mujoco.MjData,
-    site_name: str = "attachment_site",
+    site_name: str = names.EE_SITE,
 ) -> Callable[[np.ndarray], float]:
     """Return f(x)->float >= 0 iff EE linear speed stays within limit."""
 

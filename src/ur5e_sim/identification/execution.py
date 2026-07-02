@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
+from typing import Literal
 
 import mujoco
 import numpy as np
 
+from ur5e_sim.core import names
 from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.core.sensors import FTSensor
 from ur5e_sim.core.types import get_site_frame
@@ -32,14 +35,14 @@ class PlaybackConfig:
     noise_std_q: float = 0.0
     noise_std_dq: float = 0.0
     noise_std_wrench: float = 0.0
-    body_name: str = "payload_box_mount"
+    body_name: str = names.PAYLOAD_BODY
     # Site used to record the EE pose (position/rotation) at each timestep.
-    site_name: str = "attachment_site"
+    site_name: str = names.EE_SITE
     # Site of the FT sensor, used only by the analytic-wrench fallback below
     # (when the model has no FT force/torque sensors) to evaluate the body
     # regressor about the same frame a real FT sensor would report in. This is
     # a DIFFERENT site from `site_name` above.
-    ft_site_name: str = "ft_sensor"
+    ft_site_name: str = names.FT_SITE
     # Seconds to hold the initial target before recording so the arm settles
     # into its gravity-loaded equilibrium (PD-servo mode only).
     settle_time: float = 1.0
@@ -47,8 +50,14 @@ class PlaybackConfig:
     # present in the model, the recorded wrench is read from these sensors
     # (interaction force/torque in the site frame) instead of being computed
     # analytically from the rigid-body regressor.
-    force_sensor_name: str = "ft_force"
-    torque_sensor_name: str = "ft_torque"
+    force_sensor_name: str = names.FT_FORCE_SENSOR
+    torque_sensor_name: str = names.FT_TORQUE_SENSOR
+    # "auto": use the FT sensor when it resolves, else fall back to the analytic
+    #   rigid-body regressor wrench (warns on fallback instead of failing silently).
+    # "sensor": require the FT sensor to resolve; raise ValueError if it does not.
+    # "analytic": always use the rigid-body regressor wrench, skipping FT sensor
+    #   resolution entirely.
+    wrench_source: Literal["auto", "sensor", "analytic"] = "auto"
 
 
 class TrajectoryPlayback:
@@ -85,12 +94,20 @@ class TrajectoryPlayback:
         data = self._data
         n_joints = trajectory.position.shape[1]
 
-        try:
-            ft_sensor = FTSensor(model, cfg.force_sensor_name, cfg.torque_sensor_name)
-            use_ft_sensor = True
-        except ValueError:
-            ft_sensor = None
-            use_ft_sensor = False
+        ft_sensor = None
+        use_ft_sensor = False
+        if cfg.wrench_source in ("auto", "sensor"):
+            try:
+                ft_sensor = FTSensor(model, cfg.force_sensor_name, cfg.torque_sensor_name)
+                use_ft_sensor = True
+            except ValueError:
+                if cfg.wrench_source == "sensor":
+                    raise
+                warnings.warn(
+                    f"FT sensors {cfg.force_sensor_name!r}/{cfg.torque_sensor_name!r} not "
+                    "found in model; falling back to the analytic rigid-body regressor wrench.",
+                    stacklevel=2,
+                )
 
         # The analytic-fallback wrench needs the payload's rigid-body inertia.
         # The FT-sensor path does not, so only resolve it when needed -- this lets

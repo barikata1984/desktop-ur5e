@@ -13,6 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
+from ur5e_sim.core import names
+
 
 @dataclass
 class PushConfig:
@@ -57,7 +59,7 @@ class RenderConfig:
 
     width: int = 960
     height: int = 720
-    camera: str = "side"
+    camera: str = names.SIDE_CAMERA
     fps: int = 30
     every_n_mpc: int = 1
 

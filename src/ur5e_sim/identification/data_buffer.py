@@ -98,9 +98,9 @@ class DataBuffer:
         model's inertial parameters.
 
         Args:
-            site_name: FT sensor site the regressor is evaluated about (e.g.
-                ``"ft_sensor"`` for a direct-XML scene vs ``"ft300s_ft_sensor"``
-                for an assembled model from ``build_ur5e_model``).
+            site_name: FT sensor site the regressor is evaluated about (see
+                ``ur5e_sim.core.names.FT_SITE`` for the canonical name on
+                models from ``build_ur5e_model``).
 
         Returns (A_stacked, y_stacked) where:
             A_stacked: (N*6, 10) regressor matrix

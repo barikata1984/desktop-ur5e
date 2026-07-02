@@ -23,6 +23,7 @@ import mujoco
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from ur5e_sim.core import names
 from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.pushing.scene import build_push_model
 
@@ -65,7 +66,7 @@ def render_grid_video(trial_dir: Path) -> Path:
     slider_pos_qpos = slice(slider_qpos_addr, slider_qpos_addr + 3)
     slider_quat_qpos = slice(slider_qpos_addr + 3, slider_qpos_addr + 7)
 
-    key = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_KEY, "ready")
+    key = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_KEY, names.READY_KEYFRAME)
     grip_closed = m.key_qpos[key][layout.gripper_qpos].copy()
 
     z = np.load(trial_dir / "data.npz")

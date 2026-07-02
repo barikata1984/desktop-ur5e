@@ -10,6 +10,7 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 
+from ur5e_sim.core import names
 from ur5e_sim.core.ik import GRIPPER_CLOSED_CTRL, solve_ik
 from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.core.model_builder import build_ur5e_model
@@ -58,8 +59,8 @@ def main() -> None:
     m, d = build_ur5e_model(payload_xml=None)
     layout = DofLayout.from_model(m)
 
-    tip_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "gripper_pinch")
-    ori_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "attachment_site")
+    tip_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, names.PINCH_SITE)
+    ori_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, names.EE_SITE)
 
     gripper_qpos = close_gripper_sim(m, d)
 

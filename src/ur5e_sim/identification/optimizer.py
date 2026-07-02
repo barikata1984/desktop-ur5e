@@ -9,6 +9,7 @@ import mujoco
 import numpy as np
 from scipy.optimize import Bounds, minimize
 
+from ur5e_sim.core import names
 from ur5e_sim.identification.collision import CollisionConfig
 from ur5e_sim.identification.constraints import (
     JointLimits,
@@ -48,8 +49,8 @@ class OptimizerConfig:
     payload_workspace_config: WorkspaceConstraintConfig | None = None
     collision_config: CollisionConfig | None = None
     ee_velocity_config: EeVelocityConfig | None = None
-    body_name: str = "payload_box_mount"
-    site_name: str = "ft300s_ft_sensor"
+    body_name: str = names.PAYLOAD_BODY
+    site_name: str = names.FT_SITE
     enable_velocity_constraint: bool = True
     enable_acceleration_constraint: bool = True
     use_fourier_bounds: bool = False

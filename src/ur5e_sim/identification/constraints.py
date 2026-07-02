@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import mujoco
 import numpy as np
 
+from ur5e_sim.core import names
 from ur5e_sim.trajectories.base import TrajectorySample
 from ur5e_sim.trajectories.windowed_fourier import (
     WindowedFourierTrajectory,
@@ -228,9 +229,9 @@ def build_scipy_constraints(
     model: mujoco.MjModel | None = None,
     data: mujoco.MjData | None = None,
     payload_workspace_config: WorkspaceConstraintConfig | None = None,
-    payload_body_name: str = "payload_box_mount",
+    payload_body_name: str = names.PAYLOAD_BODY,
     ee_velocity_config: EeVelocityConfig | None = None,
-    site_name: str = "attachment_site",
+    site_name: str = names.EE_SITE,
     enable_velocity_constraint: bool = True,
     enable_acceleration_constraint: bool = True,
 ) -> list[dict]:

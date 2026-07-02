@@ -107,9 +107,8 @@ def sample_body_kinematics(
 
     The regressor is always evaluated about the FT sensor site so it matches the
     sensor's interaction force (cfrc_int). The caller must specify ``site_name``
-    explicitly — the correct value depends on how the model was built (e.g.
-    ``"ft_sensor"`` for a direct-XML scene vs ``"ft300s_ft_sensor"`` for an
-    assembled model from ``build_ur5e_model``).
+    explicitly (see ``ur5e_sim.core.names.FT_SITE`` for the canonical name on
+    models from ``build_ur5e_model``).
     """
     if site_name is None:
         raise ValueError("site_name must be specified")

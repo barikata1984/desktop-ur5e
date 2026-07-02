@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import sys
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +17,7 @@ import numpy as np
 import tyro
 import yaml
 
+from ur5e_sim.core import names
 from ur5e_sim.core.model_builder import build_ur5e_model
 from ur5e_sim.identification.estimators import (
     BatchLeastSquares,
@@ -34,6 +36,30 @@ _N_INERTIAL_PARAMS = 10
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 _DEFAULT_CONFIG = _REPO_ROOT / "configs" / "identification_default.yaml"
+_LEGACY_PAYLOAD_XML = "scenes/objects/payload_flat.xml"
+
+
+def _resolve_payload_xml(opt_result) -> str | None:
+    """Return the payload MJCF the optimization result was generated against.
+
+    Older result JSONs predate ``OptimizerConfig.payload_xml`` and have no
+    ``payload_xml`` field. If ``body_name`` names the payload body, the
+    trajectory was almost certainly optimized against a payload-attached
+    model, so warn and fall back to the flat payload used before per-payload
+    configuration existed.
+    """
+    payload_xml = opt_result.config.payload_xml
+    if payload_xml is not None:
+        return payload_xml
+    if opt_result.config.body_name == names.PAYLOAD_BODY:
+        warnings.warn(
+            "Optimization result JSON has no 'payload_xml' (legacy result) but "
+            f"body_name={opt_result.config.body_name!r} implies a payload was attached; "
+            f"defaulting to {_LEGACY_PAYLOAD_XML!r}.",
+            stacklevel=2,
+        )
+        return _LEGACY_PAYLOAD_XML
+    return None
 
 
 @dataclass
@@ -149,8 +175,9 @@ def main() -> None:
     trajectory = result_to_trajectory(opt_result)
     print(f"Trajectory: {len(trajectory.time)} steps, duration={trajectory.time[-1]:.2f}s")
 
-    model, data = build_ur5e_model()
-    print("Built identification model via MjSpec")
+    payload_xml = _resolve_payload_xml(opt_result)
+    model, data = build_ur5e_model(payload_xml=payload_xml)
+    print(f"Built identification model via MjSpec (payload_xml={payload_xml!r})")
 
     body_name = opt_result.config.body_name
     true_params_obj = body_inertial_parameters_from_model(model, body_name)

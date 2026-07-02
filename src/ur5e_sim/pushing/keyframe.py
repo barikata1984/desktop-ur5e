@@ -26,6 +26,7 @@ from __future__ import annotations
 import mujoco
 import numpy as np
 
+from ur5e_sim.core import names
 from ur5e_sim.core.env import get_named_object_id
 from ur5e_sim.core.ik import GRIPPER_CLOSED_CTRL, orientation_error, solve_ik
 from ur5e_sim.core.layout import DofLayout
@@ -85,15 +86,15 @@ def main() -> None:
     m, d = build_push_model()
     layout = DofLayout.from_model(m)
 
-    tip_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, "gripper_pinch")
+    tip_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, names.PINCH_SITE)
     if tip_site_id is None:
-        raise ValueError("Site 'gripper_pinch' not found in model")
-    ori_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, "attachment_site")
+        raise ValueError(f"Site '{names.PINCH_SITE}' not found in model")
+    ori_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, names.EE_SITE)
     if ori_site_id is None:
-        raise ValueError("Site 'attachment_site' not found in model")
-    base_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_BODY, "base")
+        raise ValueError(f"Site '{names.EE_SITE}' not found in model")
+    base_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_BODY, names.BASE_BODY)
     if base_id is None:
-        raise ValueError("Body 'base' not found in model")
+        raise ValueError(f"Body '{names.BASE_BODY}' not found in model")
 
     print(f"Model nq={m.nq}, nv={m.nv}, nu={m.nu}")
     print("Base body pos:", m.body_pos[base_id])

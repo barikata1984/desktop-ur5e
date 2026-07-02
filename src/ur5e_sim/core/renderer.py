@@ -8,6 +8,7 @@ import mujoco
 import numpy as np
 from PIL import Image
 
+from ur5e_sim.core import names
 from ur5e_sim.core.types import FramePose, get_body_frame, get_site_frame
 
 
@@ -102,7 +103,7 @@ def add_base_frame_overlay(
         np.array([0.1, 1.0, 0.1, 1.0], dtype=np.float32),
         np.array([0.1, 0.4, 1.0, 1.0], dtype=np.float32),
     )
-    _add_frame_overlay(scene, get_body_frame(model, data, "base"), axis_length, colors)
+    _add_frame_overlay(scene, get_body_frame(model, data, names.BASE_BODY), axis_length, colors)
 
 
 def add_ee_frame_overlay(
@@ -113,7 +114,7 @@ def add_ee_frame_overlay(
         np.array([0.4, 1.0, 0.4, 1.0], dtype=np.float32),
         np.array([0.4, 0.7, 1.0, 1.0], dtype=np.float32),
     )
-    frame = get_site_frame(model, data, "attachment_site")
+    frame = get_site_frame(model, data, names.EE_SITE)
     _add_frame_overlay(scene, frame, axis_length, colors)
 
 

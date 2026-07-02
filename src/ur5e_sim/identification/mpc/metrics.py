@@ -3,6 +3,7 @@ from __future__ import annotations
 import mujoco
 import numpy as np
 
+from ur5e_sim.core import names
 from ur5e_sim.core.env import get_named_object_id
 from ur5e_sim.trajectories.base import TrajectorySample
 
@@ -58,7 +59,7 @@ def gravity_sweep_angle(
     model: mujoco.MjModel,
     data: mujoco.MjData,
     q_trajectory: np.ndarray,
-    body_name: str = "payload_box_mount",
+    body_name: str = names.PAYLOAD_BODY,
     subsample: int = 1,
 ) -> float:
     """Cumulative angular sweep of the gravity direction in the body frame [rad].
@@ -67,8 +68,8 @@ def gravity_sweep_angle(
     Larger values indicate better excitation of the gravity-dependent
     parameters (mass, first moment).
 
-    ``body_name`` defaults to the unprefixed name from the direct-XML scene.
-    For assembled models (``build_ur5e_model``), pass the prefixed name.
+    ``body_name`` defaults to the canonical payload body name from
+    ``build_ur5e_model``.
     """
     directions = _gravity_directions_body(model, data, q_trajectory, body_name, subsample)
     return _sweep_from_directions(directions)
@@ -78,13 +79,13 @@ def gravity_direction_spread(
     model: mujoco.MjModel,
     data: mujoco.MjData,
     q_trajectory: np.ndarray,
-    body_name: str = "payload_box_mount",
+    body_name: str = names.PAYLOAD_BODY,
     subsample: int = 1,
 ) -> float:
     """Maximum opening angle from the mean gravity direction in the body frame [rad].
 
-    ``body_name`` defaults to the unprefixed name from the direct-XML scene.
-    For assembled models (``build_ur5e_model``), pass the prefixed name.
+    ``body_name`` defaults to the canonical payload body name from
+    ``build_ur5e_model``.
     """
     directions = _gravity_directions_body(model, data, q_trajectory, body_name, subsample)
     return _spread_from_directions(directions)
@@ -99,12 +100,12 @@ def trajectory_excitation_summary(
     model: mujoco.MjModel,
     data: mujoco.MjData,
     trajectory: TrajectorySample,
-    body_name: str = "payload_box_mount",
+    body_name: str = names.PAYLOAD_BODY,
 ) -> dict[str, float]:
     """Aggregate excitation-quality metrics for a trajectory.
 
-    ``body_name`` defaults to the unprefixed name from the direct-XML scene.
-    For assembled models (``build_ur5e_model``), pass the prefixed name.
+    ``body_name`` defaults to the canonical payload body name from
+    ``build_ur5e_model``.
     """
     directions = _gravity_directions_body(model, data, trajectory.position, body_name, 1)
     return {

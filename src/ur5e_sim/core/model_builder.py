@@ -13,6 +13,8 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
+from ur5e_sim.core import names
+
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 _ARM_HOME_QPOS = [1.031643, -1.461450, 2.562062, -4.242204, -1.031607, 0.000245]
@@ -51,7 +53,7 @@ def build_ur5e_model(
     data = mujoco.MjData(model)
 
     # Reset to home keyframe
-    key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, "home")
+    key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, names.HOME_KEYFRAME)
     if key_id >= 0:
         mujoco.mj_resetDataKeyframe(model, data, key_id)
     mujoco.mj_forward(model, data)
@@ -133,7 +135,7 @@ def build_spec(
     # --- 7. Position UR5e base on table ---
     # Menagerie ur5e.xml has quat="0 0 0 -1" (180° about z) on the base body.
     # Override to identity to match the project convention (y-axis toward workspace).
-    base = spec.body("base")
+    base = spec.body(names.BASE_BODY)
     base.pos = [0.0, 0.1, 0.3]
     base.quat = [1.0, 0.0, 0.0, 0.0]
 
@@ -142,7 +144,7 @@ def build_spec(
     ws_body.name = "workspace_region"
     ws_body.pos = [0.0, 0.65, 0.636]
     ws_geom = ws_body.add_geom()
-    ws_geom.name = "workspace_region_geom"
+    ws_geom.name = names.WORKSPACE_GEOM
     ws_geom.type = mujoco.mjtGeom.mjGEOM_BOX
     ws_geom.size = [0.25, 0.35, 0.275]
     ws_geom.contype = 0
@@ -201,10 +203,10 @@ def build_spec(
 def _update_home_keyframe(spec: mujoco.MjSpec) -> None:
     """Set the home keyframe qpos and ctrl for arm + gripper joints."""
     try:
-        key = spec.key("home")
+        key = spec.key(names.HOME_KEYFRAME)
     except Exception:
         key = spec.add_key()
-        key.name = "home"
+        key.name = names.HOME_KEYFRAME
 
     key.qpos = np.array(_ARM_HOME_QPOS + _GRIPPER_HOME_QPOS)
     key.ctrl = np.array(_ARM_HOME_CTRL + _GRIPPER_HOME_CTRL)

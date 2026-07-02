@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from ur5e_sim.core import names
 from ur5e_sim.identification.constraints import JointLimits
 from ur5e_sim.identification.optimizer import UR5E_HOME_QPOS
 
@@ -47,14 +48,10 @@ class MPCConfig:
     q0: np.ndarray | None = None  # initial position (None -> UR5E_HOME_QPOS)
     joint_limits: JointLimits = field(default_factory=JointLimits)
 
-    # MuJoCo identifiers. These defaults predate the programmatic builder and
-    # only body_name/site_name match a model from build_ur5e_model(). On such a
-    # model, pass the prefixed FT-sensor site explicitly (e.g.
-    # ft_site_name="ft300s_ft_sensor"). The unprefixed default below is retained
-    # until the builder becomes the sole construction path.
-    body_name: str = "payload_box_mount"
-    site_name: str = "attachment_site"  # EE pose frame (for playback)
-    ft_site_name: str = "ft_sensor"  # FT sensor site (for regressor sampling)
+    # MuJoCo identifiers, canonical to models from build_ur5e_model().
+    body_name: str = names.PAYLOAD_BODY
+    site_name: str = names.EE_SITE  # EE pose frame (for playback)
+    ft_site_name: str = names.FT_SITE  # FT sensor site (for regressor sampling)
     n_inertial_params: int = 10  # inertial parameter count for RTLS
 
     # Execution

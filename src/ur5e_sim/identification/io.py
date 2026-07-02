@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from ur5e_sim.core import names
 from ur5e_sim.identification.collision import CollisionConfig
 from ur5e_sim.identification.constraints import JointLimits, build_trajectory_from_params
 from ur5e_sim.identification.optimizer import OptimizationResult, OptimizerConfig
@@ -99,6 +100,7 @@ def save_optimization_result(
             "seed": cfg.seed,
             "body_name": cfg.body_name,
             "site_name": cfg.site_name,
+            "payload_xml": cfg.payload_xml,
             "objective_type": cfg.objective_type,
             "joint_limits": (
                 _joint_limits_to_dict(cfg.joint_limits) if cfg.joint_limits is not None else None
@@ -158,6 +160,7 @@ def load_optimization_result(path: str | Path) -> OptimizationResult:
         seed=cfg_dict["seed"],
         body_name=cfg_dict["body_name"],
         site_name=cfg_dict["site_name"],
+        payload_xml=cfg_dict.get("payload_xml", OptimizerConfig.payload_xml),
         objective_type=cfg_dict.get("objective_type", OptimizerConfig.objective_type),
         joint_limits=_joint_limits_from_dict(cfg_dict.get("joint_limits")),
         workspace_config=_workspace_config_from_dict(cfg_dict.get("workspace_config")),
@@ -230,14 +233,7 @@ def result_to_trajectory(
 
 
 # UR5e joint names in URDF order
-_UR5E_JOINT_NAMES: list[str] = [
-    "shoulder_pan",
-    "shoulder_lift",
-    "elbow",
-    "wrist_1",
-    "wrist_2",
-    "wrist_3",
-]
+_UR5E_JOINT_NAMES: list[str] = list(names.ARM_ACTUATORS)
 
 
 def save_trajectory_json(

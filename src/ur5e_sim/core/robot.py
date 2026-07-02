@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ur5e_sim.core import names
 from ur5e_sim.core.env import SimEnv
 from ur5e_sim.core.types import FramePose, get_site_frame
 
@@ -25,5 +26,5 @@ class UR5eRobot:
     def set_ctrl(self, ctrl: np.ndarray) -> None:
         self.env.data.ctrl[: self.n] = ctrl
 
-    def ee_pose(self, site_name: str = "attachment_site") -> FramePose | None:
+    def ee_pose(self, site_name: str = names.EE_SITE) -> FramePose | None:
         return get_site_frame(self.env.model, self.env.data, site_name)

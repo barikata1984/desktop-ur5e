@@ -10,6 +10,7 @@ from __future__ import annotations
 import mujoco
 import numpy as np
 
+from ur5e_sim.core import names
 from ur5e_sim.core.model_builder import build_spec
 
 # Ready keyframe: arm at vertical-pusher pose, gripper closed, slider at start.
@@ -84,7 +85,7 @@ def build_push_model() -> tuple[mujoco.MjModel, mujoco.MjData]:
         # Slider vs table/work_surface: mu=0.35, condim=4 (Hogan 2016)
         *[
             {
-                "geom1": "slider_geom",
+                "geom1": names.SLIDER_GEOM,
                 "geom2": env_geom,
                 "condim": 4,
                 "friction": [0.35, 0.35, 0.005, 0.001, 0.001],
@@ -97,32 +98,27 @@ def build_push_model() -> tuple[mujoco.MjModel, mujoco.MjData]:
         *[
             {
                 "geom1": pad_geom,
-                "geom2": "slider_geom",
+                "geom2": names.SLIDER_GEOM,
                 "condim": 4,
                 "friction": [0.3, 0.3, 0.005, 0.001, 0.001],
                 "solref": [0.004, 1.0],
                 "solimp": [0.95, 0.99, 0.001, 0.5, 2.0],
             }
-            for pad_geom in (
-                "gripper_right_pad1",
-                "gripper_right_pad2",
-                "gripper_left_pad1",
-                "gripper_left_pad2",
-            )
+            for pad_geom in names.GRIPPER_PAD_GEOMS
         ],
     ]
     extra_cameras = [
         {
             "name": "slider_track",
             "mode": mujoco.mjtCamLight.mjCAMLIGHT_TARGETBODYCOM,
-            "targetbody": "slider",
+            "targetbody": names.SLIDER_BODY,
             "pos": [0.35, 0.5, 0.65],
             "fovy": 50.0,
         },
     ]
     extra_keyframes = [
         {
-            "name": "ready",
+            "name": names.READY_KEYFRAME,
             "qpos": _READY_QPOS,
             "ctrl": _READY_CTRL,
         },
@@ -139,7 +135,7 @@ def build_push_model() -> tuple[mujoco.MjModel, mujoco.MjData]:
     model = spec.compile()
     data = mujoco.MjData(model)
 
-    key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, "ready")
+    key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, names.READY_KEYFRAME)
     if key_id >= 0:
         mujoco.mj_resetDataKeyframe(model, data, key_id)
     mujoco.mj_forward(model, data)

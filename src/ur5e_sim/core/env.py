@@ -5,6 +5,8 @@ from pathlib import Path
 
 import mujoco
 
+from ur5e_sim.core import names
+
 
 @dataclass
 class LoadedModel:
@@ -34,7 +36,7 @@ def get_workspace_bounds(
     model: mujoco.MjModel, data: mujoco.MjData
 ) -> tuple[np.ndarray, np.ndarray]:
     """Return (box_lower, box_upper) from workspace_region_geom."""
-    geom_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_GEOM, "workspace_region_geom")
+    geom_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_GEOM, names.WORKSPACE_GEOM)
     if geom_id is None:
         raise RuntimeError("workspace_region_geom not found in model")
     body_id = model.geom_bodyid[geom_id]
@@ -45,7 +47,7 @@ def get_workspace_bounds(
 
 
 def reset_to_home(model: mujoco.MjModel, data: mujoco.MjData) -> bool:
-    key_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_KEY, "home")
+    key_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_KEY, names.HOME_KEYFRAME)
     if key_id is None:
         mujoco.mj_resetData(model, data)
         mujoco.mj_forward(model, data)

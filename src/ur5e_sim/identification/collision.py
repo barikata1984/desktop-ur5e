@@ -6,19 +6,13 @@ from dataclasses import dataclass, field
 import mujoco
 import numpy as np
 
+from ur5e_sim.core import names
 from ur5e_sim.core.env import get_named_object_id
 from ur5e_sim.identification.constraints import _TrajectoryCache
 from ur5e_sim.identification.workspace import _box_vertices, find_payload_constraint_geom
 
 # UR5e link body names (shoulder through wrist_3)
-_UR5E_LINK_NAMES: list[str] = [
-    "shoulder_link",
-    "upper_arm_link",
-    "forearm_link",
-    "wrist_1_link",
-    "wrist_2_link",
-    "wrist_3_link",
-]
+_UR5E_LINK_NAMES: list[str] = list(names.UR5E_LINK_BODIES)
 
 # Non-adjacent link pairs for self-collision checking
 _SELF_COLLISION_PAIRS: list[tuple[int, int]] = [
@@ -81,7 +75,7 @@ def _extract_link_capsules(
 
 
 def _find_payload_box_geom(
-    model: mujoco.MjModel, body_name: str = "payload_box_mount"
+    model: mujoco.MjModel, body_name: str = names.PAYLOAD_BODY
 ) -> tuple[int, np.ndarray, np.ndarray]:
     """Return (geom_parent_body_id, half_extents, geom_offset) of the constraint box.
 
@@ -141,7 +135,7 @@ class CollisionChecker:
                 raise ValueError(f"Link body not found: {name}")
             self._link_body_ids.append(bid)
 
-        payload_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_BODY, "payload_box_mount")
+        payload_id = get_named_object_id(model, mujoco.mjtObj.mjOBJ_BODY, names.PAYLOAD_BODY)
 
         # Self-collision radii (sphere-sphere, tuned defaults for UR5e)
         self._self_radii = np.array(self.config.self_collision_radii, dtype=np.float64)
@@ -159,14 +153,14 @@ class CollisionChecker:
                 self._payload_body_id = payload_id
             else:
                 self._payload_body_id = get_named_object_id(
-                    model, mujoco.mjtObj.mjOBJ_BODY, "gripper_mount"
+                    model, mujoco.mjtObj.mjOBJ_BODY, names.GRIPPER_MOUNT_BODY
                 )
             self._payload_half_extents = np.array(
                 self.config.payload_half_extents, dtype=np.float64
             )
             self._payload_offset = np.array(self.config.payload_offset, dtype=np.float64)
         elif payload_id is not None:
-            geom_body_id, he, off = _find_payload_box_geom(model, "payload_box_mount")
+            geom_body_id, he, off = _find_payload_box_geom(model, names.PAYLOAD_BODY)
             self._payload_body_id = geom_body_id
             self._payload_half_extents = he
             self._payload_offset = off

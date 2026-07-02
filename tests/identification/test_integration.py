@@ -10,6 +10,8 @@ import pytest
 
 mujoco = pytest.importorskip("mujoco")
 
+from ur5e_sim.core import names  # noqa: E402
+from ur5e_sim.core.env import get_named_object_id  # noqa: E402
 from ur5e_sim.identification import (  # noqa: E402
     BatchLeastSquares,
     BatchLSConfig,
@@ -107,12 +109,10 @@ def test_optimization_and_validation_roundtrip() -> None:
 def test_playback_and_estimation_pipeline() -> None:
     """Playback a trajectory and run estimation.
 
-    On the assembled (build_ur5e_model) model the force/torque sensors are
-    prefixed ``ft300s_*`` while PlaybackConfig still defaults to the unprefixed
-    sensor names, so playback finds no usable FT sensor and falls back to the
-    analytic wrench of the payload body alone (``payload_box_mount``). The
-    estimated mass therefore matches the payload body's own mass, not the full
-    FT-sensor subtree mass. (Reconciling the sensor names is a later stage.)
+    The FT sensor (``ft300s_ft_force`` / ``ft300s_ft_torque``) measures the
+    load of the entire subtree rooted at the sensor body (``ft300s_gripper_mount``),
+    which includes the gripper mechanism and the rigidly-attached payload.
+    The estimated mass should match that subtree mass, not the payload alone.
     """
     loaded = _load_scene()
     nq, nv = loaded.model.nq, loaded.model.nv
@@ -138,8 +138,7 @@ def test_playback_and_estimation_pipeline() -> None:
 
     playback_cfg = PlaybackConfig(
         body_name=BODY_NAME,
-        site_name="attachment_site",
-        ft_site_name="ft300s_ft_sensor",
+        wrench_source="analytic",
     )
     playback = TrajectoryPlayback(loaded.model, loaded.data, playback_cfg)
     buffer = playback.execute(traj)
@@ -159,7 +158,7 @@ def test_playback_and_estimation_pipeline() -> None:
         arrays["ddq"],
         BODY_NAME,
         subsample_factor=5,
-        site_name="ft300s_ft_sensor",
+        site_name=names.FT_SITE,
     )
     wrench_stacked = arrays["wrench"][::5].reshape(-1)
 

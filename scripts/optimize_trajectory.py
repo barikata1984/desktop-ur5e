@@ -13,6 +13,7 @@ import numpy as np
 import tyro
 import yaml
 
+from ur5e_sim.core import names
 from ur5e_sim.core.env import get_workspace_bounds
 from ur5e_sim.core.layout import DofLayout
 from ur5e_sim.core.model_builder import build_ur5e_model
@@ -188,8 +189,8 @@ def main() -> None:
         workspace_config=workspace_config,
         collision_config=collision_config,
         payload_workspace_config=payload_workspace_config,
-        body_name="payload_box_mount",
-        site_name="ft300s_ft_sensor",
+        body_name=names.PAYLOAD_BODY,
+        site_name=names.FT_SITE,
         ee_velocity_config=ee_velocity_config,
         enable_velocity_constraint=enable_vel_constraint,
         enable_acceleration_constraint=has_acc,

@@ -17,6 +17,7 @@ from pathlib import Path
 import mujoco
 import numpy as np
 
+from ur5e_sim.core import names
 from ur5e_sim.core.env import get_named_object_id
 from ur5e_sim.core.ik import (
     GRIPPER_CLOSED_CTRL,
@@ -56,9 +57,9 @@ def move_tip_to(
     """Iterative 6-DOF IK move: tip to target_pos while holding tool0 vertical."""
     layout = layout or DofLayout.from_model(m)
     substeps = int(cfg.mpc.dt / m.opt.timestep)
-    tool0_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, "attachment_site")
+    tool0_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, names.EE_SITE)
     if tool0_site_id is None:
-        raise ValueError("Site 'attachment_site' not found in model")
+        raise ValueError(f"Site '{names.EE_SITE}' not found in model")
     for _ in range(max_steps):
         mujoco.mj_forward(m, d)
         tip = d.site_xpos[tip_site_id].copy()
@@ -95,29 +96,24 @@ def run(cfg: SimConfig | None = None) -> tuple[Log, Path]:
     m, d = build_push_model()
     layout = DofLayout.from_model(m)
 
-    tip_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, "gripper_pinch")
+    tip_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, names.PINCH_SITE)
     if tip_site_id is None:
-        raise ValueError("Site 'gripper_pinch' not found in model")
-    tool0_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, "attachment_site")
+        raise ValueError(f"Site '{names.PINCH_SITE}' not found in model")
+    tool0_site_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_SITE, names.EE_SITE)
     if tool0_site_id is None:
-        raise ValueError("Site 'attachment_site' not found in model")
-    slider_body_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_BODY, "slider")
+        raise ValueError(f"Site '{names.EE_SITE}' not found in model")
+    slider_body_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_BODY, names.SLIDER_BODY)
     if slider_body_id is None:
-        raise ValueError("Body 'slider' not found in model")
+        raise ValueError(f"Body '{names.SLIDER_BODY}' not found in model")
     pad_geom_ids = []
-    for name in [
-        "gripper_right_pad1",
-        "gripper_right_pad2",
-        "gripper_left_pad1",
-        "gripper_left_pad2",
-    ]:
+    for name in names.GRIPPER_PAD_GEOMS:
         gid = get_named_object_id(m, mujoco.mjtObj.mjOBJ_GEOM, name)
         if gid is None:
             raise ValueError(f"Geom '{name}' not found in model")
         pad_geom_ids.append(gid)
-    slider_geom_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_GEOM, "slider_geom")
+    slider_geom_id = get_named_object_id(m, mujoco.mjtObj.mjOBJ_GEOM, names.SLIDER_GEOM)
     if slider_geom_id is None:
-        raise ValueError("Geom 'slider_geom' not found in model")
+        raise ValueError(f"Geom '{names.SLIDER_GEOM}' not found in model")
     contact_sensor = ContactSensor(pad_geom_ids, slider_geom_id)
 
     mujoco.mj_forward(m, d)
