@@ -3,7 +3,6 @@ import pytest
 
 mujoco = pytest.importorskip("mujoco")
 
-from ur5e_sim.core.env import load_model, reset_to_home  # noqa: E402
 from ur5e_sim.identification.collision import CollisionChecker, CollisionConfig  # noqa: E402
 from ur5e_sim.identification.constraints import (  # noqa: E402
     JointLimits,
@@ -20,7 +19,7 @@ from ur5e_sim.identification.workspace import (  # noqa: E402
     make_workspace_constraint,
 )
 
-from .conftest import SCENE_PATH, arm_to_full_qpos  # noqa: E402
+from .conftest import arm_to_full_qpos, load_identification_scene  # noqa: E402
 
 NUM_JOINTS = 6
 NUM_HARMONICS = 2
@@ -48,9 +47,7 @@ def _make_x(scale: float, seed: int = 42) -> np.ndarray:
 
 
 def _load_scene():
-    loaded = load_model(SCENE_PATH)
-    reset_to_home(loaded.model, loaded.data)
-    return loaded
+    return load_identification_scene()
 
 
 # --- Joint constraint tests ---

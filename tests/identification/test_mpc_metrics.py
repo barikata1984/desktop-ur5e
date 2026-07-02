@@ -3,7 +3,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ur5e_sim.core.env import load_model, reset_to_home
 from ur5e_sim.identification.mpc.metrics import (
     acceleration_peak,
     gravity_direction_spread,
@@ -12,15 +11,13 @@ from ur5e_sim.identification.mpc.metrics import (
 )
 from ur5e_sim.trajectories.base import TrajectorySample
 
-from .conftest import SCENE_PATH
+from .conftest import load_identification_scene
 
 BODY_NAME = "payload_box_mount"
 
 
 def _load_and_reset():
-    loaded = load_model(SCENE_PATH)
-    reset_to_home(loaded.model, loaded.data)
-    return loaded
+    return load_identification_scene()
 
 
 @pytest.fixture(scope="module")

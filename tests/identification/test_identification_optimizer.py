@@ -1,5 +1,4 @@
 import tempfile
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import numpy as np
@@ -7,7 +6,6 @@ import pytest
 
 mujoco = pytest.importorskip("mujoco")
 
-from ur5e_sim.core.env import load_model, reset_to_home  # noqa: E402
 from ur5e_sim.core.model_builder import build_ur5e_model  # noqa: E402
 from ur5e_sim.identification.constraints import (  # noqa: E402
     _TrajectoryCache,
@@ -22,7 +20,6 @@ from ur5e_sim.identification.objective import (  # noqa: E402
     d_optimal_objective,
 )
 from ur5e_sim.identification.optimizer import (  # noqa: E402
-    UR5E_HOME_QPOS,
     EarlyStopConfig,
     ExcitationOptimizer,
     OptimizationResult,
@@ -30,7 +27,7 @@ from ur5e_sim.identification.optimizer import (  # noqa: E402
 )
 from ur5e_sim.identification.workspace import WorkspaceConstraintConfig  # noqa: E402
 
-from .conftest import SCENE_PATH  # noqa: E402
+from .conftest import load_identification_scene  # noqa: E402
 
 NUM_JOINTS = 6
 NUM_HARMONICS = 2
@@ -39,13 +36,11 @@ DURATION = 4.0
 FPS = 50.0
 Q0 = np.array([np.pi / 2, -np.pi / 2, np.pi / 2, -np.pi / 2, -np.pi / 2, 0.0])
 BODY_NAME = "payload_box_mount"
-FT_SITE_NAME = "ft_sensor"
+FT_SITE_NAME = "ft300s_ft_sensor"
 
 
 def _load_scene():
-    loaded = load_model(SCENE_PATH)
-    reset_to_home(loaded.model, loaded.data)
-    return loaded
+    return load_identification_scene()
 
 
 def _make_cache() -> _TrajectoryCache:
@@ -193,7 +188,7 @@ def test_optimizer_config_defaults() -> None:
     assert cfg.ftol == 1e-6
     assert cfg.seed == 42
     assert cfg.joint_limits is not None
-    assert cfg.body_name == "payload_payload_box_mount"
+    assert cfg.body_name == "payload_box_mount"
     assert cfg.site_name == "ft300s_ft_sensor"
 
 
@@ -453,33 +448,33 @@ def test_optimize_deterministic_snapshot() -> None:
     result = opt.optimize()
 
     expected_x = [
-        5.967200555151849,
-        1.0635120360020374,
-        -1.9044482289892724,
-        -7.374840320957725,
-        -1.3129578384797584,
-        -7.1214454168968055,
-        -2.2547334197205604,
-        -7.4224342949358295,
-        1.4325111095891239,
-        -0.7342554657838596,
-        -5.872204713448335,
-        0.074800088583183,
-        1.823303431089319,
-        -4.680948960544693,
-        -5.246639017455377,
-        -4.072105339437789,
-        -5.209178171932785,
-        -4.369644531778122,
-        -5.190979778819246,
-        -3.544957216305769,
-        -0.16795705876867198,
-        0.30892900573220483,
-        -0.3372101817407813,
-        4.871152084101728,
+        5.961539438852618,
+        1.0595804076370032,
+        -1.895672017522464,
+        -7.363153269430783,
+        -1.3032049451257885,
+        -7.109107867504413,
+        -2.242405375291955,
+        -7.40751579313092,
+        1.4251125890462553,
+        -0.7322156251330771,
+        -5.869148971450649,
+        0.07788336358723766,
+        1.8220749259358453,
+        -4.6729817622946905,
+        -5.23916716852168,
+        -4.0741019987093665,
+        -5.2013035577236195,
+        -4.372341828709291,
+        -5.181534584176266,
+        -3.5491128864414367,
+        -0.1642536668393827,
+        0.3210206499456059,
+        -0.33625638071364694,
+        4.86817094370642,
     ]
     np.testing.assert_allclose(result.x_opt, expected_x, rtol=1e-10)
-    np.testing.assert_allclose(result.condition_number, 7.540677480196784, rtol=1e-10)
+    np.testing.assert_allclose(result.condition_number, 7.523986947019272, rtol=1e-10)
 
 
 def test_optimize_parallel_smoke() -> None:
@@ -545,7 +540,7 @@ def test_optimize_parallel_with_payload_workspace_config() -> None:
 
     ``_run_single_restart`` used to build a payload-less model, so any
     ``payload_workspace_config`` crashed the worker with
-    ``ValueError: Unknown body: payload_payload_box_mount``. The model passed to
+    ``ValueError: Unknown body: payload_box_mount``. The model passed to
     ``ExcitationOptimizer`` here is built the same way (with a payload), so its
     prefixed names match what the worker reconstructs, and the final-result
     diagnostics (run in this process on this model) also resolve correctly.
@@ -569,8 +564,8 @@ def test_optimize_parallel_with_payload_workspace_config() -> None:
         n_workers=2,
         payload_workspace_config=ws_cfg,
         payload_xml="scenes/objects/payload_flat.xml",
-        # body_name/site_name left at OptimizerConfig defaults (the prefixed
-        # "payload_payload_box_mount" / "ft300s_ft_sensor"), matching the
+        # body_name/site_name left at OptimizerConfig defaults (the post-attach
+        # "payload_box_mount" / "ft300s_ft_sensor"), matching the
         # payload-attached model built above and the worker's own model.
     )
     opt = ExcitationOptimizer(cfg, model, data)
@@ -579,22 +574,6 @@ def test_optimize_parallel_with_payload_workspace_config() -> None:
     assert isinstance(result, OptimizationResult)
     assert len(result.restart_history) == 2
     assert np.isfinite(result.condition_number)
-
-
-@pytest.mark.skip(
-    reason=(
-        "UR5E_HOME_QPOS (pi/2-based, shared by optimizer.py and mpc/config.py) does not "
-        "match scenes/tasks/identification.xml's 'home' keyframe arm qpos "
-        "(1.324683, -1.468515, 1.368294, -1.470575, -1.570796, -0.246113). The two encode "
-        "different home poses; not expected to coincide until reconciled deliberately."
-    )
-)
-def test_ur5e_home_qpos_matches_xml_keyframe() -> None:
-    """UR5E_HOME_QPOS should equal the identification.xml keyframe's arm qpos."""
-    tree = ET.parse(SCENE_PATH)
-    key = tree.find(".//keyframe/key[@name='home']")
-    xml_qpos = np.array([float(v) for v in key.get("qpos").split()])
-    np.testing.assert_allclose(UR5E_HOME_QPOS, xml_qpos[:6])
 
 
 def test_iter_logs_key_structure() -> None:

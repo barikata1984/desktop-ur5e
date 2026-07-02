@@ -33,7 +33,6 @@ from ur5e_sim.identification.regressor import body_inertial_parameters_from_mode
 _N_INERTIAL_PARAMS = 10
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_DEFAULT_SCENE = str(_REPO_ROOT / "scenes" / "tasks" / "identification.xml")
 _DEFAULT_CONFIG = _REPO_ROOT / "configs" / "identification_default.yaml"
 
 
@@ -41,7 +40,6 @@ _DEFAULT_CONFIG = _REPO_ROOT / "configs" / "identification_default.yaml"
 class IdentificationConfig:
     """Configuration for the inertial identification demo."""
 
-    model: str = _DEFAULT_SCENE
     result_json: str = "results/excitation_result.json"
     estimator: str = "ls"
     noise_std: float = 0.0
@@ -62,8 +60,6 @@ def _build_config() -> IdentificationConfig:
     kwargs: dict = {}
 
     # Map YAML sections to flat dataclass fields
-    if "model" in yaml_data and "path" in yaml_data["model"]:
-        kwargs["model"] = yaml_data["model"]["path"]
     if "output" in yaml_data and "identification_result" in yaml_data["output"]:
         kwargs["output"] = yaml_data["output"]["identification_result"]
         kwargs["result_json"] = yaml_data["output"].get(

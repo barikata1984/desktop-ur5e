@@ -2,12 +2,26 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SCENE_PATH = str(REPO_ROOT / "scenes" / "tasks" / "identification.xml")
+from ur5e_sim.core.model_builder import build_ur5e_model
+
+# Identification scene: the box payload attached to the end effector, assembled
+# programmatically via build_ur5e_model() (the canonical construction path).
+PAYLOAD_XML = "scenes/objects/payload_box.xml"
+
+
+def load_identification_scene() -> SimpleNamespace:
+    """Build the identification model (box payload) reset to its home keyframe.
+
+    Returns an object with ``.model`` and ``.data`` attributes. build_ur5e_model
+    already resets data to the "home" keyframe and calls mj_forward.
+    """
+    model, data = build_ur5e_model(payload_xml=PAYLOAD_XML)
+    return SimpleNamespace(model=model, data=data)
+
 
 # The identification scene has 14 joints (6 arm + 8 gripper).
 # Most identification tests only care about the 6 arm joints.

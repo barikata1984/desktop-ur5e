@@ -92,6 +92,7 @@ class MPCLoop:
                 use_pd_control=config.use_pd_control,
                 body_name=config.body_name,
                 site_name=config.site_name,
+                ft_site_name=config.ft_site_name,
                 noise_std_wrench=config.noise_std_wrench,
                 settle_time=0.0,
             ),

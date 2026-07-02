@@ -3,7 +3,6 @@ import pytest
 
 mujoco = pytest.importorskip("mujoco")
 
-from ur5e_sim.core.env import load_model, reset_to_home  # noqa: E402
 from ur5e_sim.identification import (  # noqa: E402
     body_inertial_parameters_from_model,
     compute_condition_number,
@@ -17,10 +16,14 @@ from ur5e_sim.trajectories import (  # noqa: E402
     WindowedFourierTrajectoryConfig,
 )
 
-from .conftest import SCENE_PATH, arm_to_full_qpos, arm_to_full_qvel  # noqa: E402
+from .conftest import (  # noqa: E402
+    arm_to_full_qpos,
+    arm_to_full_qvel,
+    load_identification_scene,
+)
 
 PAYLOAD_BODY_NAME = "payload_box_mount"
-FT_SITE_NAME = "ft_sensor"
+FT_SITE_NAME = "ft300s_ft_sensor"
 Q0_ARM = np.array(
     [
         np.pi / 2,
@@ -34,9 +37,7 @@ Q0_ARM = np.array(
 
 
 def _load_payload_scene():
-    loaded = load_model(SCENE_PATH)
-    reset_to_home(loaded.model, loaded.data)
-    return loaded
+    return load_identification_scene()
 
 
 def _trajectory_arm(scale: float = 0.1):

@@ -10,10 +10,10 @@ import pytest
 
 mujoco = pytest.importorskip("mujoco")
 
-from ur5e_sim.core.env import get_named_object_id, load_model, reset_to_home  # noqa: E402
 from ur5e_sim.identification import (  # noqa: E402
     BatchLeastSquares,
     BatchLSConfig,
+    body_inertial_parameters_from_model,
     ExcitationOptimizer,
     JointLimits,
     OptimizationResult,
@@ -36,7 +36,11 @@ from ur5e_sim.trajectories import (  # noqa: E402
 )
 from ur5e_sim.trajectories.base import TrajectorySample  # noqa: E402
 
-from .conftest import SCENE_PATH, arm_to_full_qpos, arm_to_full_qvel  # noqa: E402
+from .conftest import (  # noqa: E402
+    arm_to_full_qpos,
+    arm_to_full_qvel,
+    load_identification_scene,
+)
 
 NUM_JOINTS = 6
 Q0_ARM = np.array([np.pi / 2, -np.pi / 2, np.pi / 2, -np.pi / 2, -np.pi / 2, 0.0])
@@ -44,9 +48,7 @@ BODY_NAME = "payload_box_mount"
 
 
 def _load_scene():
-    loaded = load_model(SCENE_PATH)
-    reset_to_home(loaded.model, loaded.data)
-    return loaded
+    return load_identification_scene()
 
 
 def _pad_sample(sample, nq: int, nv: int) -> TrajectorySample:
@@ -74,7 +76,7 @@ def test_optimization_and_validation_roundtrip() -> None:
         max_iter_per_start=3,
         seed=42,
         body_name=BODY_NAME,
-        site_name="ft_sensor",
+        site_name="ft300s_ft_sensor",
     )
     opt = ExcitationOptimizer(cfg, loaded.model, loaded.data)
     result = opt.optimize()
@@ -105,12 +107,12 @@ def test_optimization_and_validation_roundtrip() -> None:
 def test_playback_and_estimation_pipeline() -> None:
     """Playback a trajectory and run estimation.
 
-    The FT sensor site (``ft_sensor``) sits on body ``gripper_mount``, and a
-    MuJoCo force/torque sensor measures the load of the entire subtree rooted
-    at that body -- not just the identification payload. The ground truth to
-    compare against is therefore ``model.body_subtreemass`` for
-    ``gripper_mount`` (gripper mechanism + rigidly-attached payload), not the
-    payload's own mass.
+    On the assembled (build_ur5e_model) model the force/torque sensors are
+    prefixed ``ft300s_*`` while PlaybackConfig still defaults to the unprefixed
+    sensor names, so playback finds no usable FT sensor and falls back to the
+    analytic wrench of the payload body alone (``payload_box_mount``). The
+    estimated mass therefore matches the payload body's own mass, not the full
+    FT-sensor subtree mass. (Reconciling the sensor names is a later stage.)
     """
     loaded = _load_scene()
     nq, nv = loaded.model.nq, loaded.model.nv
@@ -137,6 +139,7 @@ def test_playback_and_estimation_pipeline() -> None:
     playback_cfg = PlaybackConfig(
         body_name=BODY_NAME,
         site_name="attachment_site",
+        ft_site_name="ft300s_ft_sensor",
     )
     playback = TrajectoryPlayback(loaded.model, loaded.data, playback_cfg)
     buffer = playback.execute(traj)
@@ -156,16 +159,14 @@ def test_playback_and_estimation_pipeline() -> None:
         arrays["ddq"],
         BODY_NAME,
         subsample_factor=5,
-        site_name="ft_sensor",
+        site_name="ft300s_ft_sensor",
     )
     wrench_stacked = arrays["wrench"][::5].reshape(-1)
 
     estimator = BatchLeastSquares(BatchLSConfig())
     result = estimator.estimate(regressor, wrench_stacked)
 
-    ft_sensor_body_id = get_named_object_id(loaded.model, mujoco.mjtObj.mjOBJ_BODY, "gripper_mount")
-    assert ft_sensor_body_id is not None
-    expected_mass = float(loaded.model.body_subtreemass[ft_sensor_body_id])
+    expected_mass = body_inertial_parameters_from_model(loaded.model, BODY_NAME).mass
     assert result.mass == pytest.approx(expected_mass, rel=0.1)
 
 

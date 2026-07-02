@@ -1,8 +1,6 @@
 # Default configuration for the UR5e push task.
 # Override any value via tyro CLI flags (e.g. --push.y-goal 0.85 --mpc.v-max 0.1).
 
-scene: "tasks/push.xml"
-
 push:
   push_speed: 0.03
   y_start: 0.5

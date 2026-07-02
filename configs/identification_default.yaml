@@ -1,11 +1,6 @@
 # Default configuration for UR5e inertial parameter identification pipeline.
 # Override any value via tyro CLI flags (e.g. --num-harmonics 7 --duration 8.0).
 
-model:
-  path: "scenes/tasks/identification.xml"
-  body_name: "payload_box_mount"
-  site_name: "attachment_site"
-
 trajectory:
   num_joints: 6
   num_harmonics: 5

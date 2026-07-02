@@ -11,6 +11,7 @@ import mujoco.viewer
 import numpy as np
 
 from ur5e_sim.core.ik import GRIPPER_CLOSED_CTRL, solve_ik
+from ur5e_sim.core.model_builder import build_ur5e_model
 from ur5e_sim.pushing.keyframe import close_gripper_sim
 from ur5e_sim.pushing.kinematics import R_TOOL0_DES
 
@@ -53,10 +54,9 @@ def draw_frame(viewer: mujoco.viewer.Handle, pos: np.ndarray, mat: np.ndarray) -
 
 
 def main() -> None:
-    m = mujoco.MjModel.from_xml_path("scenes/tasks/trajectory_design.xml")
-    d = mujoco.MjData(m)
+    m, d = build_ur5e_model(payload_xml=None)
 
-    tip_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "pinch")
+    tip_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "gripper_pinch")
     ori_id = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_SITE, "attachment_site")
 
     gripper_qpos = close_gripper_sim(m, d)
@@ -122,7 +122,7 @@ def main() -> None:
     traj_data = {
         "metadata": {
             "description": "Cone sweep trajectory: gripper tip Z traces 60deg-apex cone around world Z",
-            "scene": "scenes/tasks/trajectory_design.xml",
+            "scene": "build_ur5e_model(payload_xml=None)",
             "num_joints": 6,
             "num_steps": N_STEPS,
             "duration": DURATION,

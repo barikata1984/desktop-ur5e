@@ -13,8 +13,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal
 
-from ur5e_sim.pushing import paths
-
 
 @dataclass
 class PushConfig:
@@ -68,13 +66,7 @@ class RenderConfig:
 class SimConfig:
     """Top-level configuration for a single push run."""
 
-    scene: str = paths.DEFAULT_SCENE
     push: PushConfig = field(default_factory=PushConfig)
     mpc: MPCConfig = field(default_factory=MPCConfig)
     robot: RobotConfig = field(default_factory=RobotConfig)
     render: RenderConfig = field(default_factory=RenderConfig)
-
-    @property
-    def scene_path(self) -> str:
-        """Absolute path to the scene XML (resolved under ``scenes/``)."""
-        return paths.scene_path(self.scene)

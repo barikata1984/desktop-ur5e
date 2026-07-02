@@ -5,24 +5,26 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from ur5e_sim.core.env import load_model, reset_to_home
 from ur5e_sim.identification.mpc.config import MPCConfig, PlannerConfig
 from ur5e_sim.identification.mpc.loop import MPCLoop, _slice_trajectory
 from ur5e_sim.trajectories.base import TrajectorySample
 
-from .conftest import SCENE_PATH
+from .conftest import load_identification_scene
 
 
 def _load_and_reset():
-    loaded = load_model(SCENE_PATH)
-    reset_to_home(loaded.model, loaded.data)
-    return loaded
+    return load_identification_scene()
 
 
 def _short_config() -> MPCConfig:
+    # Post-attach names on the builder model (MPCConfig defaults still assume the
+    # dead direct-XML scene; overridden here until Stage 4 fixes the defaults).
     return MPCConfig(
         max_mpc_steps=2,
         planner=PlannerConfig(n_restarts=2, max_iter_per_start=20),
+        body_name="payload_box_mount",
+        site_name="attachment_site",
+        ft_site_name="ft300s_ft_sensor",
     )
 
 

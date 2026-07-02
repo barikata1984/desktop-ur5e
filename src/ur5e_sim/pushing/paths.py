@@ -14,13 +14,6 @@ SCENES_DIR = REPO_ROOT / "scenes"
 ASSETS_DIR = REPO_ROOT / "assets"
 RESULTS_DIR = REPO_ROOT / "results"
 
-DEFAULT_SCENE = "tasks/push.xml"
-
-
-def scene_path(name: str = DEFAULT_SCENE) -> str:
-    """Absolute path to a scene XML under ``scenes/`` (e.g. ``tasks/push.xml``)."""
-    return str(SCENES_DIR / name)
-
 
 def results_dir() -> Path:
     """The (gitignored) directory that holds timestamped trial outputs."""

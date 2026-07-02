@@ -69,12 +69,13 @@ python scripts/render_video.py       # trial の 2x2 グリッド動画
 
 ## シーン構成
 
-MuJoCo `<include>` によるモジュラー合成:
+モデルは `MjSpec.attach()` によるプログラム的合成で組み立てる.
+アームとグリッパは mujoco_menagerie から, FT300s とペイロード, 環境は `scenes/` 以下の断片から読み込む.
 
-| シーン | ロボット | 対象物 |
+| ビルダ | ロボット | 対象物 |
 |---|---|---|
-| `tasks/push.xml` | UR5e + Robotiq 2F-85 | スライダ (80x60x30mm, 1.05kg) |
-| `tasks/identification.xml` | UR5e + FT300s + Robotiq 2F-85 | ペイロード直方体 |
+| `build_push_model()` | UR5e + Robotiq 2F-85 | スライダ (80x60x30mm, 1.05kg) |
+| `build_ur5e_model(payload_xml=...)` | UR5e + FT300s + Robotiq 2F-85 | ペイロード直方体 |
 
 ## テスト
 
