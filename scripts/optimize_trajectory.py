@@ -186,7 +186,7 @@ def main() -> None:
         workspace_config=workspace_config,
         collision_config=collision_config,
         payload_workspace_config=payload_workspace_config,
-        body_name="payload_payload_box_mount",
+        body_name="payload_box_mount",
         site_name="ft300s_ft_sensor",
         ee_velocity_config=ee_velocity_config,
         enable_velocity_constraint=enable_vel_constraint,

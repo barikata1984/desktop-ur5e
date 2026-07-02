@@ -48,7 +48,7 @@ class OptimizerConfig:
     payload_workspace_config: WorkspaceConstraintConfig | None = None
     collision_config: CollisionConfig | None = None
     ee_velocity_config: EeVelocityConfig | None = None
-    body_name: str = "payload_payload_box_mount"
+    body_name: str = "payload_box_mount"
     site_name: str = "ft300s_ft_sensor"
     enable_velocity_constraint: bool = True
     enable_acceleration_constraint: bool = True

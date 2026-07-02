@@ -127,7 +127,7 @@ def _run_condition_worker(label: str, cond_dict: dict, output_dir: str) -> dict:
         payload_workspace_config=WorkspaceConstraintConfig(
             box_lower=box_lower, box_upper=box_upper
         ),
-        body_name="payload_payload_box_mount",
+        body_name="payload_box_mount",
         site_name="ft300s_ft_sensor",
         ee_velocity_config=EeVelocityConfig(max_linear_velocity=cond.ee_vel),
         enable_velocity_constraint=False,

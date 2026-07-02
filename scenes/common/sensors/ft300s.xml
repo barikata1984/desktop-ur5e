@@ -4,10 +4,11 @@
     Loaded via MjSpec.from_xml_path(); mesh path is resolved relative to
     THIS file's directory (scenes/common/sensors/).
 
-    On attach(), ft300s_mount's pos/quat are overridden by the attachment
-    site frame, so they are zero/identity here.
+    On attach(), mount's pos/quat are overridden by the attachment site
+    frame (prefix "ft300s_" makes it ft300s_mount post-attach), so they are
+    zero/identity here.
 
-    ft300s_mount (z=0): robot-side flange; houses the 0.3 kg sensor body.
+    mount (z=0): robot-side flange; houses the 0.3 kg sensor body.
     gripper_mount (z=0.0422): tool-side, zero-mass measurement boundary.
     The ft_sensor force/torque sensor lives on gripper_mount so its subtree
     load excludes the FT300s housing mass, matching the real sensing element
@@ -27,7 +28,7 @@
   </asset>
 
   <worldbody>
-    <body name="ft300s_mount" pos="0 0 0" quat="1 0 0 0">
+    <body name="mount" pos="0 0 0" quat="1 0 0 0">
       <inertial mass="0.300" pos="0 0 0.0211" diaginertia="0.000193 0.000193 0.000297"/>
       <geom type="mesh" mesh="ft300s" material="ft300s_body" pos="0 0 0.0422" quat="0 1 0 0"
         contype="0" conaffinity="0" group="2"/>
